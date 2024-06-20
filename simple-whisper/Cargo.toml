@@ -1,0 +1,13 @@
+[package]
+name = "simple-whisper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+derive_builder.workspace = true
+hf-hub.workspace = true
+strum.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

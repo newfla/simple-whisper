@@ -1,0 +1,10 @@
+[package]
+name = "simple-whisper-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap.workspace = true
+simple-whisper = { path = "../simple-whisper"}
+strum.workspace = true
+tokio.workspace = true
