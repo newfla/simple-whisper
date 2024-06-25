@@ -88,16 +88,17 @@ async fn main() {
             ignore_cache,
         } => {
             match WhisperBuilder::default()
-            .language(language)
-            .model(model)
-            .force_download(ignore_cache)
-            .build() {
+                .language(language)
+                .model(model)
+                .force_download(ignore_cache)
+                .build()
+            {
                 Ok(model) => {
                     let _ = model.transcribe(file).await;
-                },
-                Err(err) => println!("{err} occured\nAborting!")
+                }
+                Err(err) => println!("{err} occured\nAborting!"),
             }
-        },
+        }
         Commands::Models { sub_command } => match sub_command {
             ModelCommands::List => {
                 for model in Model::iter() {

@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use axum::{
-    extract::{ws::WebSocket, Path, Query, WebSocketUpgrade},
-    http::StatusCode,
+    extract::{ws::WebSocket, MatchedPath, Path, Query, WebSocketUpgrade},
+    http::{Request, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
     serve, Json, Router,
@@ -12,6 +12,9 @@ use simple_whisper::{Language, Model};
 use strum::{EnumIs, IntoEnumIterator, ParseError};
 use thiserror::Error;
 use tokio::net::TcpListener;
+use tower_http::trace::TraceLayer;
+use tracing::info_span;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -41,7 +44,7 @@ struct ModelResponse {
 
 #[derive(Deserialize)]
 struct ModelParameters {
-    ignore_cache: bool
+    ignore_cache: bool,
 }
 
 #[derive(EnumIs, Deserialize, Serialize)]
@@ -53,12 +56,35 @@ enum ModelDownloadResponse {
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                "simple-whisper-server=debug,tower_http=debug,axum::rejection=trace".into()
+            }),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
     let listener = TcpListener::bind("127.0.0.1:3000").await.unwrap();
     serve(listener, app()).await.unwrap();
 }
 
 fn app() -> Router {
     Router::new()
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
+                let matched_path = request
+                    .extensions()
+                    .get::<MatchedPath>()
+                    .map(MatchedPath::as_str);
+
+                info_span!(
+                    "http_request",
+                    method = ?request.method(),
+                    matched_path
+                )
+            }),
+        )
         .nest("/languages", languages())
         .nest("/models", models())
 }
@@ -109,7 +135,11 @@ async fn list_models() -> Json<Vec<ModelResponse>> {
     )
 }
 
-async fn download_model(ws: WebSocketUpgrade, Path(id): Path<String>, parameters: Query<ModelParameters>) -> Response {
+async fn download_model(
+    ws: WebSocketUpgrade,
+    Path(id): Path<String>,
+    parameters: Query<ModelParameters>,
+) -> Response {
     let maybe_model: Result<Model, Error> = Model::from_str(&id).map_err(Into::into);
     match maybe_model {
         Ok(model) => ws.on_upgrade(|socket| handle_download_model(socket, model, parameters.0)),
@@ -120,7 +150,11 @@ async fn handle_download_model(socket: WebSocket, model: Model, params: ModelPar
     let _ = internal_handle_download_model(socket, model, params).await;
 }
 
-async fn internal_handle_download_model(mut socket: WebSocket, model: Model, params: ModelParameters) -> anyhow::Result<()> {
+async fn internal_handle_download_model(
+    mut socket: WebSocket,
+    model: Model,
+    params: ModelParameters,
+) -> anyhow::Result<()> {
     socket
         .send(axum::extract::ws::Message::Text(serde_json::to_string(
             &ModelDownloadResponse::Started,
@@ -195,7 +229,7 @@ mod tests {
             .json()
             .await
             .unwrap();
-        assert_eq!(10, models.len());
+        assert_eq!(11, models.len());
 
         let websocket = Client::default()
             .get("ws://127.0.0.1:4000/models/download/tiny_en?ignore_cache=false")

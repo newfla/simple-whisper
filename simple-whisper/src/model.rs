@@ -39,9 +39,9 @@ pub enum Model {
     /// The large model v2.
     #[strum(serialize = "large_v2", to_string = "Large V2 - large_v2")]
     LargeV2,
-     /// The large model v3.
-     #[strum(serialize = "large_v3", to_string = "Large V3 - large_v3")]
-     LargeV3,
+    /// The large model v3.
+    #[strum(serialize = "large_v3", to_string = "Large V3 - large_v3")]
+    LargeV3,
 }
 struct HFCoordinates {
     repo: Repo,
