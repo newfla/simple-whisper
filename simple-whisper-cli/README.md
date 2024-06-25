@@ -2,20 +2,21 @@
 A modest CLI for speech transcription
 
 ## Example 
-`simple-whisper-cli transcribe recording.mp3 tiny_en en`
+`simple-whisper-cli transcribe recording.mp3 tiny_en en output.txt`
 
 ## Usage
 
 ```
-Usage: simple-whisper-cli <COMMAND>
+Usage: simple-whisper-cli transcribe [OPTIONS] <INPUT_FILE> <MODEL> <LANGUAGE> <OUTPUT_FILE>
 
-Commands:
-  languages   Provide information on supported languages
-  models      Provide information on supported models
-  transcribe  Transcribe audio file
-  help        Print this message or the help of the given subcommand(s)
+Arguments:
+  <INPUT_FILE>   Audio file
+  <MODEL>        Which whisper model to use
+  <LANGUAGE>     Audio language
+  <OUTPUT_FILE>  Output transcription file
 
 Options:
-  -h, --help     Print help
-  -V, --version  Print version
+      --ignore-cache  Ignore cached model files
+  -v, --verbose       Verbose STDOUT
+  -h, --help          Print help
 ```

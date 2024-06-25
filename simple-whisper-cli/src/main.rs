@@ -3,6 +3,7 @@ use std::{path::PathBuf, str::FromStr};
 use clap::{Parser, Subcommand};
 use simple_whisper::{Language, Model, WhisperBuilder};
 use strum::IntoEnumIterator;
+use tokio::fs::write;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -24,8 +25,8 @@ enum Commands {
     },
     /// Transcribe audio file
     Transcribe {
-        /// The audio file
-        file: PathBuf,
+        /// Audio file
+        input_file: PathBuf,
 
         /// Which whisper model to use
         model: Model,
@@ -33,9 +34,16 @@ enum Commands {
         /// Audio language
         language: Language,
 
+        /// Output transcription file
+        output_file: PathBuf,
+
         /// Ignore cached model files
         #[arg(long, required = false)]
         ignore_cache: bool,
+
+        /// Verbose STDOUT
+        #[arg(long, required = false, short = 'v')]
+        verbose: bool,
     },
 }
 
@@ -82,10 +90,12 @@ async fn main() {
             },
         },
         Commands::Transcribe {
-            file,
+            input_file,
+            output_file,
             model,
             language,
             ignore_cache,
+            verbose,
         } => {
             match WhisperBuilder::default()
                 .language(language)
@@ -94,7 +104,27 @@ async fn main() {
                 .build()
             {
                 Ok(model) => {
-                    let _ = model.transcribe(file).await;
+                    let mut segments: Vec<String> = Vec::new();
+                    let mut rx = model.transcribe(input_file);
+                    while let Some(msg) = rx.recv().await {
+                        match msg {
+                            Ok(msg) => {
+                                if msg.is_segment() {
+                                    segments.push(msg.to_string());
+                                    if verbose {
+                                        println!("{msg:?}")
+                                    } else {
+                                        //TODO add progressbar
+                                        println!("{msg}");
+                                    }
+                                }
+                            }
+                            Err(err) => println!("{err} occured\nAborting!"),
+                        }
+                    }
+                    if let Err(err) = write(output_file, segments.join("\n")).await {
+                        println!("{err} occured\nAborting!");
+                    }
                 }
                 Err(err) => println!("{err} occured\nAborting!"),
             }
