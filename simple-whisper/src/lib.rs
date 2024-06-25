@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 use derive_builder::Builder;
 
@@ -7,7 +7,15 @@ mod model;
 
 pub use lang::Language;
 pub use model::Model;
+use strum::{Display, EnumIs};
 use thiserror::Error;
+use tokio::{
+    spawn,
+    sync::{
+        mpsc::{unbounded_channel, UnboundedReceiver},
+        Notify,
+    },
+};
 
 #[derive(Default, Builder, Debug)]
 #[builder(setter(into), build_fn(validate = "Self::validate"))]
@@ -24,6 +32,21 @@ pub struct Whisper {
 pub enum Error {
     #[error(transparent)]
     DownloadFail(#[from] hf_hub::api::tokio::ApiError),
+}
+
+#[derive(Clone, Debug, Display, EnumIs)]
+pub enum Event {
+    #[strum(to_string = "Downloading {file}")]
+    DownloadStarted { file: String },
+    #[strum(to_string = "{file} has been downloaded")]
+    DownloadCompleted { file: String },
+    #[strum(to_string = "{transcription}")]
+    Segment {
+        start_offset: f32,
+        end_offset: f32,
+        percentage: f32,
+        transcription: String,
+    },
 }
 
 impl WhisperBuilder {
@@ -43,13 +66,45 @@ impl WhisperBuilder {
 }
 
 impl Whisper {
-    pub async fn transcribe(self, file: impl AsRef<Path>) -> Result<(), Error> {
-        let _local_model = self
-            .model
-            .download_model(self.progress_bar, self.force_download)
-            .await?;
+    pub fn transcribe(self, file: impl AsRef<Path>) -> UnboundedReceiver<Result<Event, Error>> {
+        let (tx, rx) = unbounded_channel();
+        let (tx_event, mut rx_event) = unbounded_channel();
 
-        Ok(())
+        let notify = Arc::new(Notify::new());
+        let notify2 = notify.clone();
+
+        // Download events forwarder
+        let tx_forwarder = tx.clone();
+        spawn(async move {
+            while let Some(msg) = rx_event.recv().await {
+                let _ = tx_forwarder.send(Ok(msg));
+            }
+            notify.notify_one();
+        });
+
+        spawn(async move {
+            let model = self
+                .model
+                .download_model_listener(self.progress_bar, self.force_download, tx_event)
+                .await;
+            notify2.notified().await;
+            match model {
+                Ok(model) => {
+                    //Stub send
+                    let _ = tx.send(Ok(Event::Segment {
+                        start_offset: 0.,
+                        end_offset: 0.,
+                        percentage: 0.,
+                        transcription: "Stub".to_owned(),
+                    }));
+                }
+                Err(err) => {
+                    let _ = tx.send(Err(err));
+                }
+            }
+        });
+
+        rx
     }
 }
 
@@ -84,14 +139,17 @@ mod tests {
 
     #[tokio::test]
     async fn simple_transcribe_ok() {
-        assert!(WhisperBuilder::default()
+        let mut rx = WhisperBuilder::default()
             .language(Language::Italian)
             .model(Model::Tiny)
             .progress_bar(true)
             .build()
             .unwrap()
-            .transcribe(test_file!("samples_jfk.mp3"))
-            .await
-            .is_ok());
+            .transcribe(test_file!("samples_jfk.mp3"));
+
+        while let Some(msg) = rx.recv().await {
+            assert!(msg.is_ok());
+            println!("{msg:?}");
+        }
     }
 }

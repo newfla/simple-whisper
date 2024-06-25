@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 
-use hf_hub::Repo;
+use hf_hub::{api::tokio::ApiRepo, Repo};
 use strum::{Display, EnumIter, EnumString};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
-use crate::Error;
+use crate::{Error, Event};
 
 #[derive(Default, Clone, Debug, EnumIter, EnumString, Display)]
 #[strum(serialize_all = "snake_case")]
@@ -137,34 +138,57 @@ impl Model {
         !self.to_string().contains("en")
     }
 
-    pub async fn download_model(
+    pub async fn download_model_listener(
         &self,
         progress: bool,
         force_download: bool,
+        tx: UnboundedSender<Event>,
     ) -> Result<LocalModel, Error> {
         let coordinates = self.hf_coordinates();
-        let api = hf_hub::api::tokio::ApiBuilder::default()
+        let repo = hf_hub::api::tokio::ApiBuilder::default()
             .with_progress(progress)
-            .build()?;
-        let repo = api.repo(coordinates.repo);
-
-        let (config, model, tokenizer) = match force_download {
-            false => (
-                repo.get(&coordinates.config).await?,
-                repo.get(&coordinates.model).await?,
-                repo.get(&coordinates.tokenizer).await?,
-            ),
-            true => (
-                repo.download(&coordinates.config).await?,
-                repo.download(&coordinates.model).await?,
-                repo.download(&coordinates.tokenizer).await?,
-            ),
-        };
-
+            .build()
+            .map(|api| api.repo(coordinates.repo))
+            .map_err(Into::<Error>::into)?;
+        let config = download_file(&coordinates.config, force_download, &tx, &repo).await?;
+        let model = download_file(&coordinates.model, force_download, &tx, &repo).await?;
+        let tokenizer = download_file(&coordinates.tokenizer, force_download, &tx, &repo).await?;
         Ok(LocalModel {
             config,
             model,
             tokenizer,
         })
     }
+
+    pub async fn download_model(
+        &self,
+        progress: bool,
+        force_download: bool,
+    ) -> Result<LocalModel, Error> {
+        let (tx, _rx) = unbounded_channel();
+        self.download_model_listener(progress, force_download, tx)
+            .await
+    }
+}
+
+async fn download_file(
+    file: &str,
+    force_download: bool,
+    tx: &UnboundedSender<Event>,
+    repo: &ApiRepo,
+) -> Result<PathBuf, Error> {
+    let _ = tx.send(Event::DownloadStarted {
+        file: file.to_owned(),
+    });
+    match force_download {
+        false => repo.get(file).await,
+        true => repo.download(file).await,
+    }
+    .map_err(Into::into)
+    .map(|val| {
+        let _ = tx.send(Event::DownloadCompleted {
+            file: file.to_owned(),
+        });
+        val
+    })
 }

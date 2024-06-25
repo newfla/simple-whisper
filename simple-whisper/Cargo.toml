@@ -8,6 +8,4 @@ derive_builder.workspace = true
 hf-hub.workspace = true
 strum.workspace = true
 thiserror.workspace = true
-
-[dev-dependencies]
 tokio.workspace = true
