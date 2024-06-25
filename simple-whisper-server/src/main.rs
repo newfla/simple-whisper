@@ -8,10 +8,10 @@ use axum::{
     serve, Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use simple_whisper::{Language, Model};
+use simple_whisper::{Event, Language, Model};
 use strum::{EnumIs, IntoEnumIterator, ParseError};
 use thiserror::Error;
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, spawn, sync::mpsc::unbounded_channel};
 use tower_http::trace::TraceLayer;
 use tracing::info_span;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -47,11 +47,24 @@ struct ModelParameters {
     ignore_cache: bool,
 }
 
-#[derive(EnumIs, Deserialize, Serialize)]
+#[derive(EnumIs, Debug, Deserialize, Serialize)]
 enum ModelDownloadResponse {
-    Started,
-    Completed,
+    FileStarted { file: String },
+    FileCompleted { file: String },
     Failed,
+    ModelCompleted,
+}
+
+impl TryFrom<Event> for ModelDownloadResponse {
+    type Error = ();
+
+    fn try_from(value: Event) -> Result<Self, Self::Error> {
+        match value {
+            Event::DownloadStarted { file } => Ok(Self::FileStarted { file }),
+            Event::DownloadCompleted { file } => Ok(Self::FileCompleted { file }),
+            _ => Err(()),
+        }
+    }
 }
 
 #[tokio::main]
@@ -155,16 +168,27 @@ async fn internal_handle_download_model(
     model: Model,
     params: ModelParameters,
 ) -> anyhow::Result<()> {
-    socket
-        .send(axum::extract::ws::Message::Text(serde_json::to_string(
-            &ModelDownloadResponse::Started,
-        )?))
-        .await?;
-    match model.download_model(false, params.ignore_cache).await {
+    let (tx, mut rx) = unbounded_channel();
+    let download = spawn(async move {
+        model
+            .download_model_listener(false, params.ignore_cache, tx)
+            .await
+    });
+
+    while let Some(msg) = rx.recv().await {
+        if let Ok(msg) = TryInto::<ModelDownloadResponse>::try_into(msg) {
+            socket
+                .send(axum::extract::ws::Message::Text(serde_json::to_string(
+                    &msg,
+                )?))
+                .await?;
+        }
+    }
+    match download.await {
         Ok(_) => {
             socket
                 .send(axum::extract::ws::Message::Text(serde_json::to_string(
-                    &ModelDownloadResponse::Completed,
+                    &ModelDownloadResponse::ModelCompleted,
                 )?))
                 .await?
         }
@@ -176,7 +200,6 @@ async fn internal_handle_download_model(
                 .await?
         }
     }
-
     Ok(())
 }
 
@@ -244,7 +267,8 @@ mod tests {
         let (_, mut rx) = websocket.split();
         while let Some(Ok(Message::Text(msg))) = rx.next().await {
             let msg: ModelDownloadResponse = serde_json::from_str(&msg).unwrap();
-            assert!(msg.is_started() || msg.is_completed())
+            println!("{msg:?}");
+            assert!(msg.is_file_started() || msg.is_file_completed() || msg.is_model_completed())
         }
     }
 }
