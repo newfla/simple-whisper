@@ -1,31 +1,41 @@
 use std::str::FromStr;
 
 use axum::{
-    extract::{ws::WebSocket, MatchedPath, Path, Query, WebSocketUpgrade},
+    extract::{
+        ws::{Message, WebSocket},
+        DefaultBodyLimit, MatchedPath, Path, Query, WebSocketUpgrade,
+    },
     http::{Request, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
     serve, Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use simple_whisper::{Event, Language, Model};
-use strum::{EnumIs, IntoEnumIterator, ParseError};
+use simple_whisper::{Event, Language, Model, Whisper, WhisperBuilder};
+use strum::{EnumIs, IntoEnumIterator};
+use tempfile::NamedTempFile;
 use thiserror::Error;
-use tokio::{net::TcpListener, spawn, sync::mpsc::unbounded_channel};
+use tokio::{fs::write, net::TcpListener, spawn, sync::mpsc::unbounded_channel};
 use tower_http::trace::TraceLayer;
 use tracing::info_span;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Invalid ID")]
-    InvalidID(#[from] ParseError),
+    #[error("Model {0} not supported")]
+    ModelNotSupported(String),
+    #[error("Language {0} not supported")]
+    LanguageNotSupported(String),
+    #[error("Audio file not provided")]
+    AudioNotProvided,
 }
 
 impl IntoResponse for Error {
     fn into_response(self) -> axum::response::Response {
         match self {
-            Error::InvalidID(_) => (StatusCode::NOT_FOUND, format!("{self}")),
+            Error::ModelNotSupported(_) => (StatusCode::BAD_REQUEST, format!("{self}")),
+            Error::LanguageNotSupported(_) => (StatusCode::BAD_REQUEST, format!("{self}")),
+            Error::AudioNotProvided => (StatusCode::BAD_REQUEST, format!("{self}")),
         }
         .into_response()
     }
@@ -48,21 +58,39 @@ struct ModelParameters {
 }
 
 #[derive(EnumIs, Debug, Deserialize, Serialize)]
-enum ModelDownloadResponse {
-    FileStarted { file: String },
-    FileCompleted { file: String },
+enum ServerResponse {
+    FileStarted {
+        file: String,
+    },
+    FileCompleted {
+        file: String,
+    },
     Failed,
-    ModelCompleted,
+    DownloadModelCompleted,
+    Segment {
+        start_offset: f32,
+        end_offset: f32,
+        percentage: f32,
+        transcription: String,
+    },
 }
 
-impl TryFrom<Event> for ModelDownloadResponse {
-    type Error = ();
-
-    fn try_from(value: Event) -> Result<Self, Self::Error> {
+impl From<Event> for ServerResponse {
+    fn from(value: Event) -> Self {
         match value {
-            Event::DownloadStarted { file } => Ok(Self::FileStarted { file }),
-            Event::DownloadCompleted { file } => Ok(Self::FileCompleted { file }),
-            _ => Err(()),
+            Event::DownloadStarted { file } => Self::FileStarted { file },
+            Event::DownloadCompleted { file } => Self::FileCompleted { file },
+            Event::Segment {
+                start_offset,
+                end_offset,
+                percentage,
+                transcription,
+            } => Self::Segment {
+                start_offset,
+                end_offset,
+                percentage,
+                transcription,
+            },
         }
     }
 }
@@ -98,11 +126,12 @@ fn app() -> Router {
                 )
             }),
         )
-        .nest("/languages", languages())
-        .nest("/models", models())
+        .nest("/languages", languages_router())
+        .nest("/models", models_router())
+        .nest("/transcribe", transcribe_router())
 }
 
-fn languages() -> Router {
+fn languages_router() -> Router {
     Router::new()
         .route("/list", get(list_languages))
         .route("/check/:id", get(valid_language))
@@ -124,10 +153,12 @@ async fn list_languages() -> Json<Vec<LanguageResponse>> {
 }
 
 async fn valid_language(Path(id): Path<String>) -> Result<(), Error> {
-    Language::from_str(&id).map(|_| ()).map_err(Into::into)
+    Language::from_str(&id)
+        .map(|_| ())
+        .map_err(|_| Error::LanguageNotSupported(id))
 }
 
-fn models() -> Router {
+fn models_router() -> Router {
     Router::new()
         .route("/list", get(list_models))
         .route("/download/:id", get(download_model))
@@ -153,12 +184,14 @@ async fn download_model(
     Path(id): Path<String>,
     parameters: Query<ModelParameters>,
 ) -> Response {
-    let maybe_model: Result<Model, Error> = Model::from_str(&id).map_err(Into::into);
+    let maybe_model: Result<Model, Error> =
+        Model::from_str(&id).map_err(|_| Error::ModelNotSupported(id));
     match maybe_model {
         Ok(model) => ws.on_upgrade(|socket| handle_download_model(socket, model, parameters.0)),
         Err(err) => err.into_response(),
     }
 }
+
 async fn handle_download_model(socket: WebSocket, model: Model, params: ModelParameters) {
     let _ = internal_handle_download_model(socket, model, params).await;
 }
@@ -176,28 +209,90 @@ async fn internal_handle_download_model(
     });
 
     while let Some(msg) = rx.recv().await {
-        if let Ok(msg) = TryInto::<ModelDownloadResponse>::try_into(msg) {
-            socket
-                .send(axum::extract::ws::Message::Text(serde_json::to_string(
-                    &msg,
-                )?))
-                .await?;
-        }
+        socket
+            .send(axum::extract::ws::Message::Text(serde_json::to_string(
+                &Into::<ServerResponse>::into(msg),
+            )?))
+            .await?;
     }
     match download.await {
         Ok(_) => {
             socket
-                .send(axum::extract::ws::Message::Text(serde_json::to_string(
-                    &ModelDownloadResponse::ModelCompleted,
+                .send(Message::Text(serde_json::to_string(
+                    &ServerResponse::DownloadModelCompleted,
                 )?))
                 .await?
         }
         Err(_) => {
             socket
-                .send(axum::extract::ws::Message::Text(serde_json::to_string(
-                    &ModelDownloadResponse::Failed,
+                .send(Message::Text(serde_json::to_string(
+                    &ServerResponse::Failed,
                 )?))
                 .await?
+        }
+    }
+    Ok(())
+}
+
+fn transcribe_router() -> Router {
+    Router::new()
+        .route("/:model/:lang", get(transcribe))
+        .layer(DefaultBodyLimit::max(100 * 1024 * 1024))
+}
+
+async fn transcribe(ws: WebSocketUpgrade, Path((model, lang)): Path<(String, String)>) -> Response {
+    let model = Model::from_str(&model).map_err(|_| Error::ModelNotSupported(model));
+    let lang = Language::from_str(&lang).map_err(|_| Error::LanguageNotSupported(lang));
+
+    if let Err(err) = model {
+        return err.into_response();
+    }
+
+    if let Err(err) = lang {
+        return err.into_response();
+    }
+
+    let whisper = WhisperBuilder::default()
+        .language(lang.unwrap())
+        .model(model.unwrap())
+        .force_download(false)
+        .build()
+        .unwrap();
+
+    ws.on_upgrade(|socket| handle_transcription_model(socket, whisper))
+}
+
+async fn handle_transcription_model(socket: WebSocket, model: Whisper) {
+    let _ = internal_handle_transcription_model(socket, model).await;
+}
+
+async fn internal_handle_transcription_model(
+    mut socket: WebSocket,
+    model: Whisper,
+) -> anyhow::Result<()> {
+    if let Some(Ok(Message::Binary(data))) = socket.recv().await {
+        let file = NamedTempFile::new()?;
+        write(file.path(), data).await?;
+        let mut rx = model.transcribe(file.path());
+        while let Some(msg) = rx.recv().await {
+            match msg {
+                Ok(msg) => {
+                    if msg.is_segment() {
+                        socket
+                            .send(axum::extract::ws::Message::Text(serde_json::to_string(
+                                &Into::<ServerResponse>::into(msg),
+                            )?))
+                            .await?;
+                    }
+                }
+                Err(_) => {
+                    socket
+                        .send(Message::Text(serde_json::to_string(
+                            &ServerResponse::Failed,
+                        )?))
+                        .await?
+                }
+            }
         }
     }
     Ok(())
@@ -208,12 +303,18 @@ mod tests {
     use std::future::IntoFuture;
 
     use axum::serve;
-    use futures::StreamExt;
+    use futures::{SinkExt, StreamExt};
     use reqwest::Client;
     use reqwest_websocket::{Message, RequestBuilderExt};
     use tokio::{net::TcpListener, spawn};
 
-    use crate::{app, LanguageResponse, ModelDownloadResponse, ModelResponse};
+    use crate::{app, LanguageResponse, ModelResponse, ServerResponse};
+
+    macro_rules! test_file {
+        ($file_name:expr) => {
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/", $file_name)
+        };
+    }
 
     #[tokio::test]
     async fn integration_test_languages() {
@@ -238,7 +339,7 @@ mod tests {
             .await
             .unwrap()
             .status();
-        assert_eq!(bad_request.as_u16(), 404);
+        assert_eq!(bad_request.as_u16(), 400);
     }
 
     #[tokio::test]
@@ -266,9 +367,43 @@ mod tests {
 
         let (_, mut rx) = websocket.split();
         while let Some(Ok(Message::Text(msg))) = rx.next().await {
-            let msg: ModelDownloadResponse = serde_json::from_str(&msg).unwrap();
+            let msg: ServerResponse = serde_json::from_str(&msg).unwrap();
             println!("{msg:?}");
-            assert!(msg.is_file_started() || msg.is_file_completed() || msg.is_model_completed())
+            assert!(
+                msg.is_file_started()
+                    || msg.is_file_completed()
+                    || msg.is_download_model_completed()
+            )
+        }
+    }
+
+    #[tokio::test]
+    async fn integration_test_transcription() {
+        let listener = TcpListener::bind("127.0.0.1:5000").await.unwrap();
+        spawn(serve(listener, app()).into_future());
+
+        let client = reqwest::Client::new();
+        let websocket = client
+            .get("ws://127.0.0.1:5000/transcribe/tiny/en")
+            .upgrade()
+            .send()
+            .await
+            .unwrap()
+            .into_websocket()
+            .await
+            .unwrap();
+
+        let (mut tx, mut rx) = websocket.split();
+
+        let data = tokio::fs::read(test_file!("samples_jfk.mp3"))
+            .await
+            .unwrap();
+        tx.send(Message::Binary(data)).await.unwrap();
+
+        while let Some(Ok(Message::Text(msg))) = rx.next().await {
+            let msg: ServerResponse = serde_json::from_str(&msg).unwrap();
+            println!("{msg:?}");
+            assert!(msg.is_segment())
         }
     }
 }
