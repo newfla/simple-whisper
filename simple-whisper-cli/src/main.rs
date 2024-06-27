@@ -1,7 +1,8 @@
 use std::{path::PathBuf, str::FromStr};
 
 use clap::{Parser, Subcommand};
-use simple_whisper::{Language, Model, WhisperBuilder};
+use indicatif::{ProgressBar, ProgressStyle};
+use simple_whisper::{Event, Language, Model, WhisperBuilder};
 use strum::IntoEnumIterator;
 use tokio::fs::write;
 
@@ -106,6 +107,18 @@ async fn main() {
                 Ok(model) => {
                     let mut segments: Vec<String> = Vec::new();
                     let mut rx = model.transcribe(input_file);
+                    let pb = if verbose {
+                        None
+                    } else {
+                        let pb = ProgressBar::new(100);
+                        pb.set_style(
+                            ProgressStyle::with_template(
+                                "[{elapsed_precise}] {wide_bar} eta({eta})",
+                            )
+                            .unwrap(),
+                        );
+                        Some(pb)
+                    };
                     while let Some(msg) = rx.recv().await {
                         match msg {
                             Ok(msg) => {
@@ -113,14 +126,18 @@ async fn main() {
                                     segments.push(msg.to_string());
                                     if verbose {
                                         println!("{msg:?}")
-                                    } else {
-                                        //TODO add progressbar
-                                        println!("{msg}");
+                                    } else if let Event::Segment { percentage, .. } = msg {
+                                        pb.as_ref()
+                                            .unwrap()
+                                            .set_position((percentage * 100.) as u64);
                                     }
                                 }
                             }
                             Err(err) => println!("{err} occured\nAborting!"),
                         }
+                    }
+                    if let Some(pb) = pb {
+                        pb.finish();
                     }
                     if let Err(err) = write(output_file, segments.join("\n")).await {
                         println!("{err} occured\nAborting!");

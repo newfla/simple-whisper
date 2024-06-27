@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 clap.workspace = true
+indicatif.workspace = true
 simple-whisper = { path = "../simple-whisper"}
 strum.workspace = true
 tokio.workspace = true

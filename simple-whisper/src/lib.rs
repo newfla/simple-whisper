@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc};
+use std::{path::Path, sync::Arc, time::Duration};
 
 use derive_builder::Builder;
 
@@ -95,6 +95,21 @@ impl Whisper {
                         start_offset: 0.,
                         end_offset: 0.,
                         percentage: 0.,
+                        transcription: "Stub".to_owned(),
+                    }));
+
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                    let _ = tx.send(Ok(Event::Segment {
+                        start_offset: 0.,
+                        end_offset: 0.,
+                        percentage: 0.5,
+                        transcription: "Stub".to_owned(),
+                    }));
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                    let _ = tx.send(Ok(Event::Segment {
+                        start_offset: 0.,
+                        end_offset: 0.,
+                        percentage: 1.,
                         transcription: "Stub".to_owned(),
                     }));
                 }
