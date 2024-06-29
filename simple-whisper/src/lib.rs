@@ -1,12 +1,15 @@
-use std::{path::Path, sync::Arc, time::Duration};
+use std::{fs::File, io::{self, BufReader}, path::{Path, PathBuf}, sync::Arc};
 
+use backend::Compute;
 use derive_builder::Builder;
 
+mod backend;
 mod lang;
 mod model;
 
 pub use lang::Language;
 pub use model::Model;
+use rodio::{source::UniformSourceIterator, Decoder, Source};
 use strum::{Display, EnumIs};
 use thiserror::Error;
 use tokio::{
@@ -16,6 +19,10 @@ use tokio::{
         Notify,
     },
 };
+
+type Barrier = Arc<Notify>;
+
+const SAMPLE_RATE: u32 = 16000;
 
 #[derive(Default, Builder, Debug)]
 #[builder(setter(into), build_fn(validate = "Self::validate"))]
@@ -31,7 +38,11 @@ pub struct Whisper {
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    DownloadFail(#[from] hf_hub::api::tokio::ApiError),
+    Download(#[from] hf_hub::api::tokio::ApiError),
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    AudioDecoder(#[from] rodio::decoder::DecoderError),
 }
 
 #[derive(Clone, Debug, Display, EnumIs)]
@@ -66,12 +77,14 @@ impl WhisperBuilder {
 }
 
 impl Whisper {
-    pub fn transcribe(self, file: impl AsRef<Path>) -> UnboundedReceiver<Result<Event, Error>> {
+    pub fn transcribe(self, path: impl AsRef<Path>) -> UnboundedReceiver<Result<Event, Error>> {
         let (tx, rx) = unbounded_channel();
         let (tx_event, mut rx_event) = unbounded_channel();
 
-        let notify = Arc::new(Notify::new());
-        let notify2 = notify.clone();
+        let wait_download = Barrier::default();
+        let download_completed = wait_download.clone();
+
+        let path = path.as_ref().into();
 
         // Download events forwarder
         let tx_forwarder = tx.clone();
@@ -79,39 +92,28 @@ impl Whisper {
             while let Some(msg) = rx_event.recv().await {
                 let _ = tx_forwarder.send(Ok(msg));
             }
-            notify.notify_one();
+            wait_download.notify_one();
         });
 
         spawn(async move {
+
+            // Download model data from Huggingface
             let model = self
                 .model
                 .download_model_listener(self.progress_bar, self.force_download, tx_event)
                 .await;
-            notify2.notified().await;
-            match model {
-                Ok(model) => {
-                    //Stub send
-                    let _ = tx.send(Ok(Event::Segment {
-                        start_offset: 0.,
-                        end_offset: 0.,
-                        percentage: 0.,
-                        transcription: "Stub".to_owned(),
-                    }));
+            download_completed.notified().await;
 
-                    tokio::time::sleep(Duration::from_secs(2)).await;
-                    let _ = tx.send(Ok(Event::Segment {
-                        start_offset: 0.,
-                        end_offset: 0.,
-                        percentage: 0.5,
-                        transcription: "Stub".to_owned(),
-                    }));
-                    tokio::time::sleep(Duration::from_secs(2)).await;
-                    let _ = tx.send(Ok(Event::Segment {
-                        start_offset: 0.,
-                        end_offset: 0.,
-                        percentage: 1.,
-                        transcription: "Stub".to_owned(),
-                    }));
+            // Load audio file
+            let audio = Self::load_audio(path);
+            
+            match audio.map(|audio| (audio, model)) {
+                Ok((audio, Ok(model_files)))=> {
+                    Compute::new(self.language, model_files, audio, tx).compute().await;
+                    
+                }
+                Ok((_, Err(err)))  => {
+                    let _ = tx.send(Err(err));
                 }
                 Err(err) => {
                     let _ = tx.send(Err(err));
@@ -120,6 +122,12 @@ impl Whisper {
         });
 
         rx
+    }
+    fn load_audio(path: PathBuf) -> Result<Vec<f32>, Error> {
+        let resample = UniformSourceIterator::new(Decoder::new(BufReader::new(File::open(path)?))?, 1, SAMPLE_RATE);
+        let samples = resample.low_pass(3000).high_pass(200).convert_samples().collect::<Vec<f32>>();
+    
+        Ok(samples)
     }
 }
 

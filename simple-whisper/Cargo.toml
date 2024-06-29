@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 derive_builder.workspace = true
 hf-hub.workspace = true
+rodio.workspace = true
 strum.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
