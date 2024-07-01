@@ -1,14 +1,21 @@
-use std::{fs::File, io::{self, BufReader}, path::{Path, PathBuf}, sync::Arc};
+use std::{
+    fs::File,
+    io::{self, BufReader},
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
-use backend::Compute;
+use burn::backend::{NdArray, Wgpu};
 use derive_builder::Builder;
+use transcribe::{TranscribeBuilder, TranscribeBuilderError};
 
-mod backend;
-mod lang;
-mod model;
+mod burn_impl;
+mod languages;
+mod models;
+mod transcribe;
 
-pub use lang::Language;
-pub use model::Model;
+pub use languages::Language;
+pub use models::Model;
 use rodio::{source::UniformSourceIterator, Decoder, Source};
 use strum::{Display, EnumIs};
 use thiserror::Error;
@@ -18,11 +25,12 @@ use tokio::{
         mpsc::{unbounded_channel, UnboundedReceiver},
         Notify,
     },
+    task::spawn_blocking,
 };
 
 type Barrier = Arc<Notify>;
 
-const SAMPLE_RATE: u32 = 16000;
+pub const SAMPLE_RATE: u32 = 16000;
 
 #[derive(Default, Builder, Debug)]
 #[builder(setter(into), build_fn(validate = "Self::validate"))]
@@ -33,6 +41,8 @@ pub struct Whisper {
     progress_bar: bool,
     #[builder(default = "false")]
     force_download: bool,
+    #[builder(default = "false")]
+    force_cpu: bool,
 }
 
 #[derive(Error, Debug)]
@@ -43,6 +53,14 @@ pub enum Error {
     Io(#[from] io::Error),
     #[error(transparent)]
     AudioDecoder(#[from] rodio::decoder::DecoderError),
+    #[error(transparent)]
+    ComputeBuilder(#[from] TranscribeBuilderError),
+    #[error("Failed to initialize the tokenizer. Reason {0}")]
+    Tokenizer(String),
+    #[error(transparent)]
+    BurnConfig(#[from] burn::config::ConfigError),
+    #[error(transparent)]
+    BurnRecorder(#[from] burn::record::RecorderError),
 }
 
 #[derive(Clone, Debug, Display, EnumIs)]
@@ -96,7 +114,6 @@ impl Whisper {
         });
 
         spawn(async move {
-
             // Download model data from Huggingface
             let model = self
                 .model
@@ -104,29 +121,65 @@ impl Whisper {
                 .await;
             download_completed.notified().await;
 
-            // Load audio file
-            let audio = Self::load_audio(path);
-            
-            match audio.map(|audio| (audio, model)) {
-                Ok((audio, Ok(model_files)))=> {
-                    Compute::new(self.language, model_files, audio, tx).compute().await;
-                    
+            spawn_blocking(move || {
+                // Load audio file
+                let audio = Self::load_audio(path);
+
+                match audio.map(|audio| (audio, model)) {
+                    Ok((audio, Ok(model_files))) => {
+                        if self.force_cpu {
+                            match TranscribeBuilder::<NdArray>::default()
+                                .language(self.language)
+                                .audio(audio)
+                                .tx(tx.clone())
+                                .try_model(model_files)
+                                .unwrap()
+                                .build()
+                            {
+                                Ok(compute) => compute.transcribe(),
+                                Err(err) => {
+                                    let _ = tx.send(Err(err.into()));
+                                }
+                            }
+                        } else {
+                            match TranscribeBuilder::<Wgpu>::default()
+                                .language(self.language)
+                                .audio(audio)
+                                .tx(tx.clone())
+                                .try_model(model_files)
+                                .unwrap()
+                                .build()
+                            {
+                                Ok(compute) => compute.transcribe(),
+                                Err(err) => {
+                                    let _ = tx.send(Err(err.into()));
+                                }
+                            }
+                        }
+                    }
+                    Ok((_, Err(err))) => {
+                        let _ = tx.send(Err(err));
+                    }
+                    Err(err) => {
+                        let _ = tx.send(Err(err));
+                    }
                 }
-                Ok((_, Err(err)))  => {
-                    let _ = tx.send(Err(err));
-                }
-                Err(err) => {
-                    let _ = tx.send(Err(err));
-                }
-            }
+            });
         });
 
         rx
     }
     fn load_audio(path: PathBuf) -> Result<Vec<f32>, Error> {
-        let resample = UniformSourceIterator::new(Decoder::new(BufReader::new(File::open(path)?))?, 1, SAMPLE_RATE);
-        let samples = resample.low_pass(3000).high_pass(200).convert_samples().collect::<Vec<f32>>();
-    
+        let reader = BufReader::new(File::open(path)?);
+        let decoder = Decoder::new(reader)?;
+        let resample: UniformSourceIterator<Decoder<BufReader<File>>, f32> =
+            UniformSourceIterator::new(decoder, 1, SAMPLE_RATE);
+        let samples = resample
+            .low_pass(3000)
+            .high_pass(200)
+            .convert_samples()
+            .collect::<Vec<f32>>();
+
         Ok(samples)
     }
 }
@@ -166,9 +219,10 @@ mod tests {
             .language(Language::Italian)
             .model(Model::Tiny)
             .progress_bar(true)
+            .force_cpu(true)
             .build()
             .unwrap()
-            .transcribe(test_file!("samples_jfk.mp3"));
+            .transcribe(test_file!("samples_jfk.wav"));
 
         while let Some(msg) = rx.recv().await {
             assert!(msg.is_ok());

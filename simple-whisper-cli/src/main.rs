@@ -3,7 +3,7 @@ use std::{path::PathBuf, str::FromStr};
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 use simple_whisper::{Event, Language, Model, WhisperBuilder};
-use strum::IntoEnumIterator;
+use strum::{EnumMessage, IntoEnumIterator};
 use tokio::fs::write;
 
 #[derive(Parser, Debug)]
@@ -82,7 +82,7 @@ async fn main() {
         Commands::Languages { sub_command } => match sub_command {
             LangCommands::List => {
                 for lang in Language::iter() {
-                    println!("{lang}")
+                    println!("{}", lang.get_message().unwrap())
                 }
             }
             LangCommands::Check { code } => match Language::from_str(&code) {

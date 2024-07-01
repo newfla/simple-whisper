@@ -12,7 +12,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use simple_whisper::{Event, Language, Model, Whisper, WhisperBuilder};
-use strum::{EnumIs, IntoEnumIterator};
+use strum::{EnumIs, EnumMessage, IntoEnumIterator};
 use tempfile::NamedTempFile;
 use thiserror::Error;
 use tokio::{fs::write, net::TcpListener, spawn, sync::mpsc::unbounded_channel};
@@ -141,7 +141,7 @@ async fn list_languages() -> Json<Vec<LanguageResponse>> {
     Json(
         Language::iter()
             .map(|l| {
-                let binding = l.to_string();
+                let binding = l.get_message().unwrap();
                 let (lang, code) = binding.split_once('-').unwrap();
                 LanguageResponse {
                     id: code.trim().to_owned(),

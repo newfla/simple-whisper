@@ -51,10 +51,11 @@ struct HFCoordinates {
     tokenizer: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct LocalModel {
-    config: PathBuf,
-    model: PathBuf,
-    tokenizer: PathBuf,
+    pub config: PathBuf,
+    pub model: PathBuf,
+    pub tokenizer: PathBuf,
 }
 
 impl Model {
