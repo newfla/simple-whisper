@@ -101,6 +101,7 @@ async fn main() {
             match WhisperBuilder::default()
                 .language(language)
                 .model(model)
+                .progress_bar(true)
                 .force_download(ignore_cache)
                 .build()
             {
