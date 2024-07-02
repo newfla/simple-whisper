@@ -91,7 +91,7 @@ fn get_top_elements<T>(elems: &[T], score: impl Fn(&T) -> f64, num: usize) -> Ve
 
         // most common scenario
         if top_elems.len() == num && score < scores[0] {
-           continue;
+            continue;
         }
 
         if let Some((idx, _)) = scores.iter().enumerate().find(|(_, &s)| s >= score) {

@@ -295,7 +295,6 @@ pub fn stfft<B: Backend>(
         .reshape([n_batch, n_hops, hop_length])
         .transpose();
     let parts: Vec<_> = (0..num_parts)
-        .into_iter()
         .map(|i| {
             template
                 .clone()
@@ -324,7 +323,7 @@ pub fn stfft<B: Backend>(
         .unsqueeze()
         .matmul(input_windows);
 
-    return (real_part, imaginary_part);
+    (real_part, imaginary_part)
 }
 
 fn div_roundup(a: usize, b: usize) -> usize {

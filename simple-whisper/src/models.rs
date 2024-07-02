@@ -151,9 +151,9 @@ impl Model {
             .build()
             .map(|api| api.repo(coordinates.repo))
             .map_err(Into::<Error>::into)?;
+        let tokenizer = download_file(&coordinates.tokenizer, force_download, &tx, &repo).await?;
         let config = download_file(&coordinates.config, force_download, &tx, &repo).await?;
         let model = download_file(&coordinates.model, force_download, &tx, &repo).await?;
-        let tokenizer = download_file(&coordinates.tokenizer, force_download, &tx, &repo).await?;
         Ok(LocalModel {
             config,
             model,

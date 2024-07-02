@@ -1,3 +1,4 @@
+#![allow(clippy::single_range_in_vec_init)]
 pub(crate) mod audio;
 pub(crate) mod beam;
 mod helper;

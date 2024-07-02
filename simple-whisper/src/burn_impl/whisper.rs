@@ -72,7 +72,6 @@ impl AudioEncoderConfig {
             .init(device);
         let gelu2 = Gelu::new();
         let blocks: Vec<_> = (0..self.n_audio_layer)
-            .into_iter()
             .map(|_| {
                 ResidualEncoderAttentionBlockConfig::new(self.n_audio_state, self.n_audio_head)
                     .init(device)
@@ -146,7 +145,7 @@ impl<B: Backend> AudioEncoder<B> {
             x = block.forward(x);
         }
 
-        return self.ln_post.forward(x);
+        self.ln_post.forward(x)
     }
 }
 
@@ -172,7 +171,6 @@ impl TextDecoderConfig {
             device,
         ));
         let blocks: Vec<_> = (0..self.n_text_layer)
-            .into_iter()
             .map(|_| {
                 ResidualDecoderAttentionBlockConfig::new(self.n_text_state, self.n_text_head)
                     .init(device)
@@ -231,7 +229,7 @@ impl<B: Backend> TextDecoder<B> {
         }
 
         let x = self.ln.forward(x);
-        return x.matmul(self.token_embedding.val().transpose().unsqueeze::<3>());
+        x.matmul(self.token_embedding.val().transpose().unsqueeze::<3>())
     }
 }
 
@@ -277,8 +275,7 @@ impl<B: Backend> ResidualDecoderAttentionBlock<B> {
     fn forward(&self, x: Tensor<B, 3>, xa: Tensor<B, 3>, mask: Tensor<B, 2>) -> Tensor<B, 3> {
         let x = x.clone() + self.attn.forward(self.attn_ln.forward(x), Some(mask));
         let x = x.clone() + self.cross_attn.forward(self.cross_attn_ln.forward(x), xa);
-        let x = x.clone() + self.mlp.forward(self.mlp_ln.forward(x));
-        x
+        x.clone() + self.mlp.forward(self.mlp_ln.forward(x))
     }
 }
 
@@ -315,8 +312,7 @@ struct ResidualEncoderAttentionBlock<B: Backend> {
 impl<B: Backend> ResidualEncoderAttentionBlock<B> {
     fn forward(&self, x: Tensor<B, 3>) -> Tensor<B, 3> {
         let x = x.clone() + self.attn.forward(self.attn_ln.forward(x), None);
-        let x = x.clone() + self.mlp.forward(self.mlp_ln.forward(x));
-        x
+        x.clone() + self.mlp.forward(self.mlp_ln.forward(x))
     }
 }
 
@@ -346,9 +342,7 @@ impl<B: Backend> Mlp<B> {
     pub fn forward(&self, x: Tensor<B, 3>) -> Tensor<B, 3> {
         let x = self.lin1.forward(x);
         let x = self.gelu.forward(x);
-        let x = self.lin2.forward(x);
-
-        x
+        self.lin2.forward(x)
     }
 }
 

@@ -213,13 +213,13 @@ mod tests {
             .unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn simple_transcribe_ok() {
         let mut rx = WhisperBuilder::default()
             .language(Language::Italian)
             .model(Model::Tiny)
             .progress_bar(true)
-            .force_cpu(true)
+            .force_cpu(false)
             .build()
             .unwrap()
             .transcribe(test_file!("samples_jfk.wav"));

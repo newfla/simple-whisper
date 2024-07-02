@@ -46,7 +46,7 @@ impl<B: Backend> ModelImpl<B> {
     fn transcribe(self, waveform: Vec<f32>, lang: Language) -> impl Iterator<Item = Event> {
         let (tot, mels) = self.waveform_to_mel_tensor(waveform);
         mels.enumerate().map(move |(idx, mel)| {
-            let transcription = self.mels_to_text(lang.clone(), mel).unwrap();
+            let transcription = self.mels_to_text(lang, mel).unwrap();
             Event::Segment {
                 start_offset: 0.,
                 end_offset: 0.,
@@ -73,7 +73,7 @@ impl<B: Backend> ModelImpl<B> {
 
         (
             iter_len,
-            (0..iter_len).into_iter().map(move |i| {
+            (0..iter_len).map(move |i| {
                 let start = i * shift;
                 let end = (start + n_samples_per_tensor).min(waveform.len());
 
@@ -82,7 +82,7 @@ impl<B: Backend> ModelImpl<B> {
                 let waveform =
                     Tensor::from_floats(Data::new(slice.to_vec(), [slice.len()].into()), &device);
 
-               prep_audio(waveform.unsqueeze(), SAMPLE_RATE as f64, n_mels)
+                prep_audio(waveform.unsqueeze(), SAMPLE_RATE as f64, n_mels)
             }),
         )
     }
@@ -123,7 +123,6 @@ impl<B: Backend> ModelImpl<B> {
 
         let vocab_size = self.vocab_size();
         let special_tokens_maskout: Vec<f32> = (0..vocab_size)
-            .into_iter()
             .map(|token| {
                 if self.is_special(token) {
                     neg_infty
@@ -148,7 +147,7 @@ impl<B: Backend> ModelImpl<B> {
                     let additional_tokens = max_seq_len - beam.seq.len();
                     beam.seq
                         .iter()
-                        .map(|btok| *btok)
+                        .copied()
                         .chain(once(0).cycle().take(additional_tokens))
                 })
                 .collect();
@@ -183,7 +182,7 @@ impl<B: Backend> ModelImpl<B> {
                     .value
             });
 
-            let continuations = beam_log_probs
+            beam_log_probs
                 .zip(beams)
                 .map(|(log_probs, beam)| {
                     log_probs
@@ -193,9 +192,7 @@ impl<B: Backend> ModelImpl<B> {
                         .map(|(token_id, log_prob)| (token_id, beam.log_prob + log_prob))
                         .collect()
                 })
-                .collect();
-
-            continuations
+                .collect()
         };
 
         let beamsearch_is_finished = |toks: &[BeamSearchToken]| {
