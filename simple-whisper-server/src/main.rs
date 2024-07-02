@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 
 use axum::{
     extract::{
@@ -68,8 +68,8 @@ enum ServerResponse {
     Failed,
     DownloadModelCompleted,
     Segment {
-        start_offset: f32,
-        end_offset: f32,
+        start_offset: Duration,
+        end_offset: Duration,
         percentage: f32,
         transcription: String,
     },

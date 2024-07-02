@@ -1,4 +1,4 @@
-use std::{iter::once, ops::Div};
+use std::{iter::once, ops::Div, time::Duration};
 
 use burn::{
     backend::{ndarray::NdArrayDevice, wgpu::WgpuDevice, NdArray, Wgpu},
@@ -13,7 +13,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     burn_impl::{
-        audio::{max_waveform_samples, prep_audio},
+        audio::{max_waveform_samples, prep_audio, HOP_LENGTH},
         beam::{self, beam_search},
         token::SpecialToken,
         whisper::{WhisperModel, WhisperModelConfig},
@@ -29,7 +29,7 @@ const CHUNK_OVERLAP: u32 = SAMPLE_RATE * 0; //0 --> disable overlapping
 #[builder(setter(into))]
 pub struct Transcribe<B: Backend> {
     language: Language,
-    audio: Vec<f32>,
+    audio: (Vec<f32>, Duration),
     tx: UnboundedSender<Result<Event, Error>>,
     #[builder(try_setter, setter(into, name = "model"))]
     model_impl: ModelImpl<B>,
@@ -43,18 +43,31 @@ pub(crate) struct ModelImpl<B: Backend> {
 }
 
 impl<B: Backend> ModelImpl<B> {
-    fn transcribe(self, waveform: Vec<f32>, lang: Language) -> impl Iterator<Item = Result<Event,Error>> {
+    fn transcribe(
+        self,
+        audio: (Vec<f32>, Duration),
+        lang: Language,
+    ) -> impl Iterator<Item = Result<Event, Error>> {
+        let (waveform, total_duration) = audio;
+        let duration_weight = waveform.len() as f64 / (total_duration.as_millis() as usize * HOP_LENGTH.pow(2)) as f64;
         let init_tokens = self.init_token(lang);
         let (tot, mels) = self.waveform_to_mel_tensor(waveform);
+        
+        let mut prev_offset = Duration::from_millis(0);
         mels.enumerate().map(move |(idx, mel)| {
-            self.mels_to_text(init_tokens.clone(), mel).map(|transcription| {
-                Event::Segment {
-                    start_offset: 0.,
-                    end_offset: 0.,
-                    percentage: (idx + 1) as f32 / tot as f32,
-                    transcription,
-                }
-            })
+            self.mels_to_text(init_tokens.clone(), mel)
+                .map(|(transcription, length)| {
+                    let actual_length = Duration::from_millis((duration_weight * length as f64 * SAMPLE_RATE as f64) as u64);
+                    let end_offset = prev_offset + actual_length;
+                    let event = Event::Segment {
+                        start_offset: prev_offset,
+                        end_offset,
+                        percentage: (idx + 1) as f32 / tot as f32,
+                        transcription,
+                    };
+                    prev_offset = end_offset;
+                    event
+                })
         })
     }
 
@@ -89,7 +102,11 @@ impl<B: Backend> ModelImpl<B> {
         )
     }
 
-    fn mels_to_text(&self, token_utility: TokenUtility<B>, mels: Tensor<B, 3>) -> Result<String, Error> {
+    fn mels_to_text(
+        &self,
+        token_utility: TokenUtility<B>,
+        mels: Tensor<B, 3>,
+    ) -> Result<(String, usize), Error> {
         let device = mels.device();
 
         let n_ctx_max_encoder = self.cfg.audio_encoder_ctx_size();
@@ -97,9 +114,10 @@ impl<B: Backend> ModelImpl<B> {
         let [_, n_mel, n_ctx] = mels.dims();
 
         // the zero padding helps whisper determine end of text
+        let length = (n_ctx).min(n_ctx_max_encoder - PADDING);
         let mels = Tensor::cat(
             vec![
-                mels.slice([0..1, 0..n_mel, 0..(n_ctx).min(n_ctx_max_encoder - PADDING)]),
+                mels.slice([0..1, 0..n_mel, 0..length]),
                 Tensor::zeros([1, n_mel, PADDING], &device),
             ],
             2,
@@ -187,7 +205,7 @@ impl<B: Backend> ModelImpl<B> {
             max_depth,
         );
 
-        self.decode(&tokens[..], true)
+        self.decode(&tokens[..], true).map(|val| (val, length))
     }
 
     fn init_token(&self, lang: Language) -> TokenUtility<B> {

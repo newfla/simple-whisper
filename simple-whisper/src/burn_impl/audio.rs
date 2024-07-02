@@ -3,7 +3,7 @@ use burn::tensor::{activation::relu, backend::Backend, ElementConversion, Tensor
 use crate::burn_impl::helper::*;
 
 const N_FFT: usize = 400;
-const HOP_LENGTH: usize = 160;
+pub const HOP_LENGTH: usize = 160;
 const WINDOW_LENGTH: usize = N_FFT;
 
 /// Returns the maximum number of waveform samples that can be submitted to `prep_audio`

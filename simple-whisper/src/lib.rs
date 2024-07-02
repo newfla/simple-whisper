@@ -3,6 +3,7 @@ use std::{
     io::{self, BufReader},
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
 use burn::backend::{NdArray, Wgpu};
@@ -53,6 +54,8 @@ pub enum Error {
     Io(#[from] io::Error),
     #[error(transparent)]
     AudioDecoder(#[from] rodio::decoder::DecoderError),
+    #[error("Unable to find duration")]
+    AudioDuration,
     #[error(transparent)]
     ComputeBuilder(#[from] TranscribeBuilderError),
     #[error("Failed to initialize the tokenizer. Reason {0}")]
@@ -71,8 +74,8 @@ pub enum Event {
     DownloadCompleted { file: String },
     #[strum(to_string = "{transcription}")]
     Segment {
-        start_offset: f32,
-        end_offset: f32,
+        start_offset: Duration,
+        end_offset: Duration,
         percentage: f32,
         transcription: String,
     },
@@ -169,9 +172,11 @@ impl Whisper {
 
         rx
     }
-    fn load_audio(path: PathBuf) -> Result<Vec<f32>, Error> {
+    
+    fn load_audio(path: PathBuf) -> Result<(Vec<f32>, Duration), Error> {
         let reader = BufReader::new(File::open(path)?);
         let decoder = Decoder::new(reader)?;
+        let duration = decoder.total_duration().ok_or(Error::AudioDuration)?;
         let resample: UniformSourceIterator<Decoder<BufReader<File>>, f32> =
             UniformSourceIterator::new(decoder, 1, SAMPLE_RATE);
         let samples = resample
@@ -180,7 +185,7 @@ impl Whisper {
             .convert_samples()
             .collect::<Vec<f32>>();
 
-        Ok(samples)
+        Ok((samples, duration))
     }
 }
 
