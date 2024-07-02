@@ -7,7 +7,6 @@ edition = "2021"
 burn.workspace = true
 derive_builder.workspace = true
 hf-hub.workspace = true
-num-traits.workspace = true
 rodio.workspace = true
 strum.workspace = true
 thiserror.workspace = true

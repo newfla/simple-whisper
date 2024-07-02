@@ -110,24 +110,7 @@ fn get_mel_filters_device<B: Backend>(
         .powf_scalar(-1)
         * 2.0;
     //weights *= enorm[:, np.newaxis]
-    let weights = weights * enorm.unsqueeze::<2>().transpose();
-
-    // Only check weights if f_mel[0] is positive
-    /*if not np.all((mel_f[:-2] == 0) | (weights.max(axis=1) > 0)):
-    # This means we have an empty channel somewhere
-    warnings.warn(
-        "Empty filters detected in mel frequency basis. "
-        "Some channels will produce empty responses. "
-        "Try increasing your sampling rate (and fmax) or "
-        "reducing n_mels.",
-        stacklevel=2,
-    )*/
-    if !(all_zeros(mel_f.slice([0..(n_mels - 2)])) || all_zeros(relu(-weights.clone().max_dim(1))))
-    {
-        println!("Empty filters detected in mel frequency basis. \nSome channels will produce empty responses. \nTry increasing your sampling rate (and fmax) or reducing n_mels.");
-    }
-
-    weights
+    weights * enorm.unsqueeze::<2>().transpose()
 }
 
 fn fft_frequencies_device<B: Backend>(

@@ -1,5 +1,3 @@
-pub type BeamSearchToken = usize;
-
 #[derive(Clone)]
 pub struct BeamNode<T: Clone> {
     pub seq: Vec<T>,
@@ -15,7 +13,7 @@ pub fn beam_search<T, F, G>(
 ) -> Vec<T>
 where
     T: Clone,
-    F: Fn(&[BeamNode<T>]) -> Vec<Vec<(T, f64)>> + Clone,
+    F: FnOnce(&[BeamNode<T>]) -> Vec<Vec<(T, f64)>> + Clone,
     G: Fn(&[T]) -> bool + Clone,
 {
     let mut beams = initial_beams;
@@ -47,7 +45,7 @@ pub fn beam_search_step<T, F, G>(
 ) -> Vec<BeamNode<T>>
 where
     T: Clone,
-    F: Fn(&[BeamNode<T>]) -> Vec<Vec<(T, f64)>>,
+    F: FnOnce(&[BeamNode<T>]) -> Vec<Vec<(T, f64)>>,
     G: Fn(&[T]) -> bool,
 {
     let mut finished_beams = Vec::with_capacity(beam_size);

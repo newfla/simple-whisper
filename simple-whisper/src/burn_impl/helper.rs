@@ -2,8 +2,6 @@ use burn::tensor::{
     activation::relu, backend::Backend, BasicOps, Element, Numeric, Tensor, TensorKind,
 };
 
-use num_traits::ToPrimitive;
-
 pub fn tensor_max_scalar<B: Backend, const D: usize>(x: Tensor<B, D>, max: f64) -> Tensor<B, D> {
     relu(x.sub_scalar(max)).add_scalar(max)
 }
@@ -19,10 +17,6 @@ pub fn tensor_min<B: Backend, const D: usize>(x: Tensor<B, D>, min: Tensor<B, D>
 pub fn tensor_log10<B: Backend, const D: usize>(x: Tensor<B, D>) -> Tensor<B, D> {
     let ln10 = (10.0f64).ln();
     x.log() / ln10
-}
-
-pub fn all_zeros<B: Backend, const D: usize>(x: Tensor<B, D>) -> bool {
-    x.abs().max().into_scalar().to_f64().unwrap() == 0.0
 }
 
 pub fn _10pow<B: Backend, const D: usize>(x: Tensor<B, D>) -> Tensor<B, D> {

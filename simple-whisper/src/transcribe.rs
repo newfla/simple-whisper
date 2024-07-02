@@ -14,7 +14,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::{
     burn_impl::{
         audio::{max_waveform_samples, prep_audio},
-        beam::{self, beam_search, BeamSearchToken},
+        beam::{self, beam_search},
         token::SpecialToken,
         whisper::{WhisperModel, WhisperModelConfig},
     },
@@ -43,16 +43,18 @@ pub(crate) struct ModelImpl<B: Backend> {
 }
 
 impl<B: Backend> ModelImpl<B> {
-    fn transcribe(self, waveform: Vec<f32>, lang: Language) -> impl Iterator<Item = Event> {
+    fn transcribe(self, waveform: Vec<f32>, lang: Language) -> impl Iterator<Item = Result<Event,Error>> {
+        let init_tokens = self.init_token(lang);
         let (tot, mels) = self.waveform_to_mel_tensor(waveform);
         mels.enumerate().map(move |(idx, mel)| {
-            let transcription = self.mels_to_text(lang, mel).unwrap();
-            Event::Segment {
-                start_offset: 0.,
-                end_offset: 0.,
-                percentage: (idx + 1) as f32 / tot as f32,
-                transcription,
-            }
+            self.mels_to_text(init_tokens.clone(), mel).map(|transcription| {
+                Event::Segment {
+                    start_offset: 0.,
+                    end_offset: 0.,
+                    percentage: (idx + 1) as f32 / tot as f32,
+                    transcription,
+                }
+            })
         })
     }
 
@@ -87,7 +89,7 @@ impl<B: Backend> ModelImpl<B> {
         )
     }
 
-    fn mels_to_text(&self, lang: Language, mels: Tensor<B, 3>) -> Result<String, Error> {
+    fn mels_to_text(&self, token_utility: TokenUtility<B>, mels: Tensor<B, 3>) -> Result<String, Error> {
         let device = mels.device();
 
         let n_ctx_max_encoder = self.cfg.audio_encoder_ctx_size();
@@ -104,39 +106,11 @@ impl<B: Backend> ModelImpl<B> {
         );
         let encoder_output = self.model.forward_encoder(mels);
 
-        let start_token = self.special_token(SpecialToken::StartofTranscript).unwrap();
-        let transcription_token = self.special_token(SpecialToken::Transcribe).unwrap();
-        let lang_token = self.special_token(SpecialToken::Language(lang)).unwrap();
-        let end_token = self.special_token(SpecialToken::EndofText).unwrap();
-        let notimestamp = self.special_token(SpecialToken::NoTimeStamps).unwrap();
-
-        let mut initial_tokens = Vec::new();
-        initial_tokens.extend([start_token, lang_token, transcription_token, notimestamp]);
-
-        type BeamNode = beam::BeamNode<BeamSearchToken>;
+        type BeamNode = beam::BeamNode<usize>;
         let initial_tokens = BeamNode {
-            seq: initial_tokens,
+            seq: token_utility.inital_tokens,
             log_prob: 0.0,
         };
-
-        let neg_infty = -f32::INFINITY;
-
-        let vocab_size = self.vocab_size();
-        let special_tokens_maskout: Vec<f32> = (0..vocab_size)
-            .map(|token| {
-                if self.is_special(token) {
-                    neg_infty
-                } else {
-                    0.0
-                }
-            })
-            .collect();
-        //special_tokens_maskout[end_token] = 1.0;
-
-        let special_tokens_maskout = Tensor::from_data(
-            Data::new(special_tokens_maskout, [vocab_size].into()).convert(),
-            &device,
-        );
 
         let beamsearch_next = |beams: &[BeamNode]| {
             // convert tokens into tensor
@@ -166,7 +140,7 @@ impl<B: Backend> ModelImpl<B> {
             let logits = if max_seq_len > 5 {
                 logits
             } else {
-                logits + special_tokens_maskout.clone().unsqueeze()
+                logits + token_utility.special_tokens_maskout.unsqueeze()
             };
             let log_probs = log_softmax(logits, 2);
 
@@ -195,9 +169,9 @@ impl<B: Backend> ModelImpl<B> {
                 .collect()
         };
 
-        let beamsearch_is_finished = |toks: &[BeamSearchToken]| {
+        let beamsearch_is_finished = |toks: &[usize]| {
             if let Some(btok) = toks.last() {
-                *btok == end_token
+                *btok == token_utility.end_token
             } else {
                 false
             }
@@ -216,13 +190,48 @@ impl<B: Backend> ModelImpl<B> {
         self.decode(&tokens[..], true)
     }
 
-    pub fn special_token(&self, token: SpecialToken) -> Option<usize> {
+    fn init_token(&self, lang: Language) -> TokenUtility<B> {
+        let start_token = self.special_token(SpecialToken::StartofTranscript).unwrap();
+        let transcription_token = self.special_token(SpecialToken::Transcribe).unwrap();
+        let lang_token = self.special_token(SpecialToken::Language(lang)).unwrap();
+        let end_token = self.special_token(SpecialToken::EndofText).unwrap();
+        let notimestamp = self.special_token(SpecialToken::NoTimeStamps).unwrap();
+
+        let vec = vec![start_token, lang_token, transcription_token, notimestamp];
+
+        let vocab_size = self.tokenizer.get_vocab_size(true);
+
+        let special_tokens_maskout: Vec<f32> = (0..vocab_size)
+            .map(|token| {
+                if self.is_special(token) {
+                    -f32::INFINITY
+                } else {
+                    0.
+                }
+            })
+            .collect();
+
+        let device = self.model.devices()[0].clone();
+
+        let special_tokens_maskout = Tensor::from_data(
+            Data::new(special_tokens_maskout, [vocab_size].into()).convert(),
+            &device,
+        );
+
+        TokenUtility {
+            inital_tokens: vec,
+            end_token,
+            special_tokens_maskout,
+        }
+    }
+
+    fn special_token(&self, token: SpecialToken) -> Option<usize> {
         self.tokenizer
             .token_to_id(&token.to_string())
             .map(|t| t as usize)
     }
 
-    pub fn decode(&self, tokens: &[usize], skip_special: bool) -> Result<String, Error> {
+    fn decode(&self, tokens: &[usize], skip_special: bool) -> Result<String, Error> {
         self.tokenizer
             .decode(
                 &tokens.iter().map(|t| *t as u32).collect::<Vec<u32>>(),
@@ -231,11 +240,7 @@ impl<B: Backend> ModelImpl<B> {
             .map_err(|err| Error::Tokenizer(err.to_string()))
     }
 
-    pub fn vocab_size(&self) -> usize {
-        self.tokenizer.get_vocab_size(true)
-    }
-
-    pub fn is_special(&self, token: usize) -> bool {
+    fn is_special(&self, token: usize) -> bool {
         self.tokenizer
             .decode(vec![token as u32].as_slice(), true)
             .ok()
@@ -258,6 +263,7 @@ impl<B: Backend> ModelImpl<B> {
         })
     }
 }
+
 impl TryFrom<LocalModel> for ModelImpl<NdArray> {
     type Error = Error;
 
@@ -266,6 +272,7 @@ impl TryFrom<LocalModel> for ModelImpl<NdArray> {
         ModelImpl::load_model(value, device)
     }
 }
+
 impl TryFrom<LocalModel> for ModelImpl<Wgpu> {
     type Error = Error;
 
@@ -277,33 +284,19 @@ impl TryFrom<LocalModel> for ModelImpl<Wgpu> {
 
 impl<B: Backend> Transcribe<B> {
     pub fn transcribe(self) {
-        for segment in self.model_impl.transcribe(self.audio, self.language) {
-            if self.tx.send(Ok(segment)).is_err() {
+        for msg in self.model_impl.transcribe(self.audio, self.language) {
+            if self.tx.send(msg).is_err() {
                 break;
             }
         }
-
-        //Stub send
-        // let _ = self.tx.send(Ok(Event::Segment {
-        //     start_offset: 0.,
-        //     end_offset: 0.,
-        //     percentage: 0.,
-        //     transcription: "Stub0".to_owned(),
-        // }));
-
-        // let _ = self.tx.send(Ok(Event::Segment {
-        //     start_offset: 0.,
-        //     end_offset: 0.,
-        //     percentage: 0.5,
-        //     transcription: "Stub1".to_owned(),
-        // }));
-        // let _ = self.tx.send(Ok(Event::Segment {
-        //     start_offset: 0.,
-        //     end_offset: 0.,
-        //     percentage: 1.,
-        //     transcription: "Stub2".to_owned(),
-        // }));
     }
+}
+
+#[derive(Clone)]
+struct TokenUtility<B: Backend> {
+    inital_tokens: Vec<usize>,
+    end_token: usize,
+    special_tokens_maskout: Tensor<B, 1>,
 }
 
 fn tokenizer(value: &LocalModel) -> Result<Tokenizer, Error> {
