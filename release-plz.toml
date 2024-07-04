@@ -28,4 +28,4 @@ semver_check = false
 
 [[package]]
 name = "simple-whisper"
-changelog_path = "CHANGELOG.md"
+changelog_path = "../CHANGELOG.md"
