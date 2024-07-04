@@ -1,7 +1,14 @@
 [package]
 name = "simple-whisper"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
 
 [dependencies]
 burn.workspace = true

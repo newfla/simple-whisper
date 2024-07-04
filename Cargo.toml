@@ -1,11 +1,19 @@
 [workspace]
-
 members = [
     "simple-whisper-cli",
     "simple-whisper-server",
     "simple-whisper"
 ]
 resolver = "2"
+
+[workspace.package]
+edition = "2021"
+authors = ["Flavio Bizzarri <fl.bizzarri@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/newfla/simple-whisper"
+keywords = ["ai, whisper, burn"]
+categories = ["science","multimedia"]
 
 [workspace.dependencies]
 anyhow = "1.0.86"
