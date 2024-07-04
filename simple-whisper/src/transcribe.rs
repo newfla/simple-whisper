@@ -49,15 +49,18 @@ impl<B: Backend> ModelImpl<B> {
         lang: Language,
     ) -> impl Iterator<Item = Result<Event, Error>> {
         let (waveform, total_duration) = audio;
-        let duration_weight = waveform.len() as f64 / (total_duration.as_millis() as usize * HOP_LENGTH.pow(2)) as f64;
+        let duration_weight = waveform.len() as f64
+            / (total_duration.as_millis() as usize * HOP_LENGTH.pow(2)) as f64;
         let init_tokens = self.init_token(lang);
         let (tot, mels) = self.waveform_to_mel_tensor(waveform);
-        
+
         let mut prev_offset = Duration::from_millis(0);
         mels.enumerate().map(move |(idx, mel)| {
             self.mels_to_text(init_tokens.clone(), mel)
                 .map(|(transcription, length)| {
-                    let actual_length = Duration::from_millis((duration_weight * length as f64 * SAMPLE_RATE as f64) as u64);
+                    let actual_length = Duration::from_millis(
+                        (duration_weight * length as f64 * SAMPLE_RATE as f64) as u64,
+                    );
                     let end_offset = prev_offset + actual_length;
                     let event = Event::Segment {
                         start_offset: prev_offset,

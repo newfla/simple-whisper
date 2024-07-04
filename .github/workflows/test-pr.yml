@@ -1,0 +1,42 @@
+name: "test-on-pr"
+on: [pull_request]
+
+jobs:
+  check-whisper:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: check fmt
+      run: cargo fmt --all -- --check
+
+  test-whisper:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+
+      - name: check build
+        run: cargo build 
+
+      - name: run generic tests
+        run: cargo test
+    
+      - name: run inference tests
+        if: matrix.platform == 'macos-latest'
+        run: cargo test --release

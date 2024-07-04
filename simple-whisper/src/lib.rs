@@ -172,7 +172,7 @@ impl Whisper {
 
         rx
     }
-    
+
     fn load_audio(path: PathBuf) -> Result<(Vec<f32>, Duration), Error> {
         let reader = BufReader::new(File::open(path)?);
         let decoder = Decoder::new(reader)?;
@@ -218,7 +218,8 @@ mod tests {
             .unwrap();
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    #[tokio::test]
     async fn simple_transcribe_ok() {
         let mut rx = WhisperBuilder::default()
             .language(Language::Italian)

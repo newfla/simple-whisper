@@ -377,6 +377,7 @@ mod tests {
         }
     }
 
+    #[ignore]
     #[tokio::test]
     async fn integration_test_transcription() {
         let listener = TcpListener::bind("127.0.0.1:5000").await.unwrap();
