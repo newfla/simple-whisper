@@ -1,6 +1,6 @@
 # Simple Whisper
 
-Transcription library/cli/server base on [OpenAI Whisper](https://github.com/openai/whisper) model written using [Burn framework](https://github.com/tracel-ai/burn).
+Transcription library/cli/server base on [OpenAI Whisper](https://github.com/openai/whisper) model written using [Burn framework ](https://github.com/tracel-ai/burn)🔥.
 
 ## What is included?
 

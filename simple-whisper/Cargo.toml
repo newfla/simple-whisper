@@ -1,10 +1,11 @@
 [package]
 name = "simple-whisper"
 version = "0.1.0"
+readme = "README.md"
+description = "OpenAI whisper models running Burn 🔥"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-readme.workspace = true
 repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
