@@ -25,3 +25,7 @@ publish_allow_dirty = false
 
 # disable running `cargo-semver-checks`
 semver_check = false
+
+[[package]]
+name = "simple-whisper"
+changelog_path = "CHANGELOG.md"
