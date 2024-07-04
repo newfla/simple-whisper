@@ -62,7 +62,7 @@ struct TranscribeParameters {
     #[serde(default)]
     ignore_cache: bool,
     #[serde(default)]
-    force_cpu:bool
+    force_cpu: bool,
 }
 
 #[derive(EnumIs, Debug, Deserialize, Serialize)]
@@ -248,7 +248,11 @@ fn transcribe_router() -> Router {
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024))
 }
 
-async fn transcribe(ws: WebSocketUpgrade, Path((model, lang)): Path<(String, String)>, parameters: Query<TranscribeParameters>,) -> Response {
+async fn transcribe(
+    ws: WebSocketUpgrade,
+    Path((model, lang)): Path<(String, String)>,
+    parameters: Query<TranscribeParameters>,
+) -> Response {
     let model = Model::from_str(&model).map_err(|_| Error::ModelNotSupported(model));
     let lang = Language::from_str(&lang).map_err(|_| Error::LanguageNotSupported(lang));
     if let Err(err) = model {
