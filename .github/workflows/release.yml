@@ -131,6 +131,11 @@ jobs:
       - name: Install dependencies
         run: |
           ${{ matrix.packages_install }}
+      - name: install dependencies (ubuntu only)
+        if: matrix.runner == 'ubuntu-20.04'
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y libasound2-dev
       - name: Build artifacts
         run: |
           # Actually do builds and make zips and whatnot
