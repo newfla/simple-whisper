@@ -1,5 +1,7 @@
 use strum::{Display, EnumIs, EnumIter, EnumMessage, EnumString};
 
+
+/// Languages supported by the tokenizer
 #[derive(Default, Clone, Copy, Debug, EnumIs, EnumIter, EnumString, Display, EnumMessage)]
 pub enum Language {
     #[default]
