@@ -10,6 +10,8 @@ jobs:
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
+      with: 
+        components: rustfmt
     
     - name: check fmt
       run: cargo fmt --all -- --check
@@ -25,6 +27,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -39,4 +47,4 @@ jobs:
     
       - name: run inference tests
         if: matrix.platform == 'macos-latest'
-        run: cargo test --release
+        run: cargo test --release -- --ignored
