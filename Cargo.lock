@@ -3910,7 +3910,7 @@ dependencies = [
 
 [[package]]
 name = "simple-whisper-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
  "indicatif",
@@ -3921,7 +3921,7 @@ dependencies = [
 
 [[package]]
 name = "simple-whisper-server"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "axum",
