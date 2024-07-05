@@ -10,6 +10,7 @@ use axum::{
     routing::get,
     serve, Json, Router,
 };
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 use simple_whisper::{Event, Language, Model, Whisper, WhisperBuilder};
 use strum::{EnumIs, EnumMessage, IntoEnumIterator};
@@ -19,6 +20,14 @@ use tokio::{fs::write, net::TcpListener, spawn, sync::mpsc::unbounded_channel};
 use tower_http::trace::TraceLayer;
 use tracing::info_span;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    /// Ignore cached model files
+    #[arg(long, short='p', default_value = "3000")]
+    server_port: u16,
+}
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -105,6 +114,7 @@ impl From<Event> for ServerResponse {
 
 #[tokio::main]
 async fn main() {
+    let cli = Cli::parse();
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -114,7 +124,9 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let listener = TcpListener::bind("127.0.0.1:3000").await.unwrap();
+    let listener = TcpListener::bind(("127.0.0.1", cli.server_port))
+        .await
+        .unwrap();
     serve(listener, app()).await.unwrap();
 }
 
