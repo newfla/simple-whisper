@@ -17,7 +17,8 @@ Transcription library/cli/server base on [OpenAI Whisper](https://github.com/ope
 - Fast enough on every platform.
 
 ## No Goals
-- It is **NOT** intended to be the fastest Whisper implementation.
+- It is **NOT** intended to be the fastest/accurate Whisper implementation.
+- **NOT production ready** 
 
 ## Credits
 The project was inspired by:

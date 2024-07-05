@@ -30,13 +30,11 @@ struct Cli {
 }
 
 #[derive(Error, Debug)]
-pub enum Error {
+enum Error {
     #[error("Model {0} not supported")]
     ModelNotSupported(String),
     #[error("Language {0} not supported")]
     LanguageNotSupported(String),
-    #[error("Audio file not provided")]
-    AudioNotProvided,
 }
 
 impl IntoResponse for Error {
@@ -44,7 +42,6 @@ impl IntoResponse for Error {
         match self {
             Error::ModelNotSupported(_) => (StatusCode::BAD_REQUEST, format!("{self}")),
             Error::LanguageNotSupported(_) => (StatusCode::BAD_REQUEST, format!("{self}")),
-            Error::AudioNotProvided => (StatusCode::BAD_REQUEST, format!("{self}")),
         }
         .into_response()
     }
