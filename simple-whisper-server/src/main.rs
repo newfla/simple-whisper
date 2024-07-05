@@ -24,8 +24,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    /// Ignore cached model files
-    #[arg(long, short='p', default_value = "3000")]
+    /// Server listening port
+    #[arg(long, short = 'p', default_value = "3000")]
     server_port: u16,
 }
 
