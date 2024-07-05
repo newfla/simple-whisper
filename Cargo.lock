@@ -3925,6 +3925,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "clap",
  "futures",
  "reqwest 0.12.5",
  "reqwest-websocket",

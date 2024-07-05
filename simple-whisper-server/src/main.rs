@@ -10,6 +10,7 @@ use axum::{
     routing::get,
     serve, Json, Router,
 };
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 use simple_whisper::{Event, Language, Model, Whisper, WhisperBuilder};
 use strum::{EnumIs, EnumMessage, IntoEnumIterator};
@@ -20,14 +21,20 @@ use tower_http::trace::TraceLayer;
 use tracing::info_span;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    /// Server listening port
+    #[arg(long, short = 'p', default_value = "3000")]
+    server_port: u16,
+}
+
 #[derive(Error, Debug)]
-pub enum Error {
+enum Error {
     #[error("Model {0} not supported")]
     ModelNotSupported(String),
     #[error("Language {0} not supported")]
     LanguageNotSupported(String),
-    #[error("Audio file not provided")]
-    AudioNotProvided,
 }
 
 impl IntoResponse for Error {
@@ -35,7 +42,6 @@ impl IntoResponse for Error {
         match self {
             Error::ModelNotSupported(_) => (StatusCode::BAD_REQUEST, format!("{self}")),
             Error::LanguageNotSupported(_) => (StatusCode::BAD_REQUEST, format!("{self}")),
-            Error::AudioNotProvided => (StatusCode::BAD_REQUEST, format!("{self}")),
         }
         .into_response()
     }
@@ -105,6 +111,7 @@ impl From<Event> for ServerResponse {
 
 #[tokio::main]
 async fn main() {
+    let cli = Cli::parse();
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -114,7 +121,9 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let listener = TcpListener::bind("127.0.0.1:3000").await.unwrap();
+    let listener = TcpListener::bind(("127.0.0.1", cli.server_port))
+        .await
+        .unwrap();
     serve(listener, app()).await.unwrap();
 }
 
