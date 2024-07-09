@@ -1,4 +1,4 @@
-use std::{iter::once, ops::Div, time::Duration};
+use std::{iter::once, ops::Div, path::Path, time::Duration};
 
 use burn::{
     backend::{ndarray::NdArrayDevice, wgpu::WgpuDevice, NdArray, Wgpu},
@@ -13,7 +13,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     burn_impl::{
-        audio::{max_waveform_samples, prep_audio, HOP_LENGTH},
+        audio::{max_waveform_samples, prep_audio},
         beam::{self, beam_search},
         token::SpecialToken,
         whisper::{WhisperModel, WhisperModelConfig},
@@ -22,8 +22,8 @@ use crate::{
     Error, Event, Language, SAMPLE_RATE,
 };
 
-const PADDING: usize = 200;
-const CHUNK_OVERLAP: u32 = SAMPLE_RATE * 0; //0 --> disable overlapping
+const PADDING: usize = 100;
+const CHUNK_OVERLAP: u32 = SAMPLE_RATE * 5; //0 --> disable overlapping
 
 #[derive(Builder, Debug)]
 #[builder(setter(into))]
@@ -49,35 +49,100 @@ impl<B: Backend> ModelImpl<B> {
         lang: Language,
     ) -> impl Iterator<Item = Result<Event, Error>> {
         let (waveform, total_duration) = audio;
-        let duration_weight = waveform.len() as f64
-            / (total_duration.as_millis() as usize * HOP_LENGTH.pow(2)) as f64;
         let init_tokens = self.init_token(lang);
-        let (tot, mels) = self.waveform_to_mel_tensor(waveform);
+        let (tot, tot_samples, mels) = self.waveform_to_mel_tensor(waveform);
 
-        let mut prev_offset = Duration::from_millis(0);
-        mels.enumerate().map(move |(idx, mel)| {
-            self.mels_to_text(init_tokens.clone(), mel)
-                .map(|(transcription, length)| {
-                    let actual_length = Duration::from_millis(
-                        (duration_weight * length as f64 * SAMPLE_RATE as f64) as u64,
-                    );
-                    let end_offset = prev_offset + actual_length;
-                    let event = Event::Segment {
-                        start_offset: prev_offset,
+        let mut start_offset = Duration::from_millis(0);
+        let mut tokens: Vec<usize> = Vec::new();
+        let mut last_token_sent_index = 0;
+        let mut samples_counter_estimate = 0;
+        let sample_time_weigth = total_duration / tot_samples as u32;
+        mels.enumerate().filter_map(move |(idx, mel)| {
+            samples_counter_estimate += (tot_samples / tot) as u32;
+
+            let new_tokens = self.mels_to_tokens(init_tokens.clone(), mel);
+
+            // Handle the last segment by flushing all the remaining tokens
+            if idx == tot - 1 {
+                tokens.extend(new_tokens);
+                Some(
+                    self.decode(&tokens[last_token_sent_index..], true)
+                        .map(|transcription| Event::Segment {
+                            start_offset,
+                            end_offset: total_duration,
+                            percentage: 1.,
+                            transcription,
+                        }),
+                )
+            } else if let Some((prev_index, curr_index)) =
+                Self::find_chunk_overlap(&tokens, &new_tokens, 30, 3)
+            {
+                // Remove the overlapping tokens
+                tokens.truncate(prev_index);
+
+                // Find time offset
+                let end_offset = samples_counter_estimate * sample_time_weigth;
+
+                let res = self
+                    .decode(&tokens[last_token_sent_index..prev_index], true)
+                    .map(|transcription| Event::Segment {
+                        start_offset,
                         end_offset,
                         percentage: (idx + 1) as f32 / tot as f32,
                         transcription,
-                    };
-                    prev_offset = end_offset;
-                    event
-                })
+                    });
+                //Extend tokens with new tokens that don't overlaps
+                tokens.extend(&new_tokens[curr_index..]);
+                last_token_sent_index = prev_index;
+                start_offset = end_offset;
+                Some(res)
+            } else {
+                tokens.extend(new_tokens);
+                None
+            }
         })
+    }
+
+    fn find_chunk_overlap(
+        prev_tokens: &[usize],
+        curr_tokens: &[usize],
+        max_n_offsets: usize,
+        min_n_overlaps: usize,
+    ) -> Option<(usize, usize)> {
+        let mut max_overlap = 0;
+        let mut max_overlap_indices = (0, 0);
+        let n_offsets = prev_tokens.len().min(curr_tokens.len()).min(max_n_offsets);
+
+        for offset in 0..n_offsets {
+            let prev_start_index = prev_tokens.len() - 1 - offset;
+            let mut overlap_iter = prev_tokens
+                .iter()
+                .skip(prev_start_index)
+                .zip(curr_tokens.iter())
+                .enumerate()
+                .filter(|(_, (&old, &new))| old == new);
+
+            let n_overlap = overlap_iter.clone().count();
+            if n_overlap > max_overlap {
+                max_overlap = n_overlap;
+
+                let curr_overlap_index = overlap_iter.next().unwrap().0;
+                let prev_overlap_index = prev_start_index + curr_overlap_index;
+                max_overlap_indices = (prev_overlap_index, curr_overlap_index)
+            }
+        }
+
+        if max_overlap >= min_n_overlaps {
+            Some(max_overlap_indices)
+        } else {
+            None
+        }
     }
 
     fn waveform_to_mel_tensor(
         &self,
         waveform: Vec<f32>,
-    ) -> (usize, impl Iterator<Item = Tensor<B, 3>>) {
+    ) -> (usize, usize, impl Iterator<Item = Tensor<B, 3>>) {
         let device = self.model.devices()[0].clone();
         let window_length_samples =
             max_waveform_samples(self.cfg.audio_encoder_ctx_size() - PADDING);
@@ -88,13 +153,19 @@ impl<B: Backend> ModelImpl<B> {
             .saturating_sub(CHUNK_OVERLAP as usize)
             .max(1);
         let iter_len = waveform.len().saturating_sub(1).div(shift) + 1;
-
+        let total_samples = (0..iter_len)
+            .map(|i| {
+                let start = i * shift;
+                let end = (start + n_samples_per_tensor).min(waveform.len());
+                end - start
+            })
+            .sum();
         (
             iter_len,
+            total_samples,
             (0..iter_len).map(move |i| {
                 let start = i * shift;
                 let end = (start + n_samples_per_tensor).min(waveform.len());
-
                 let slice = &waveform[start..end];
 
                 let waveform =
@@ -105,11 +176,7 @@ impl<B: Backend> ModelImpl<B> {
         )
     }
 
-    fn mels_to_text(
-        &self,
-        token_utility: TokenUtility<B>,
-        mels: Tensor<B, 3>,
-    ) -> Result<(String, usize), Error> {
+    fn mels_to_tokens(&self, token_utility: TokenUtility, mels: Tensor<B, 3>) -> Vec<usize> {
         let device = mels.device();
 
         let n_ctx_max_encoder = self.cfg.audio_encoder_ctx_size();
@@ -132,6 +199,12 @@ impl<B: Backend> ModelImpl<B> {
             seq: token_utility.inital_tokens,
             log_prob: 0.0,
         };
+
+        let vocab_size = token_utility.special_tokens_maskout.len();
+        let special_tokens_maskout = Tensor::from_data(
+            Data::new(token_utility.special_tokens_maskout, [vocab_size].into()).convert(),
+            &device,
+        );
 
         let beamsearch_next = |beams: &[BeamNode]| {
             // convert tokens into tensor
@@ -161,7 +234,7 @@ impl<B: Backend> ModelImpl<B> {
             let logits = if max_seq_len > 5 {
                 logits
             } else {
-                logits + token_utility.special_tokens_maskout.unsqueeze()
+                logits + special_tokens_maskout.clone().unsqueeze()
             };
             let log_probs = log_softmax(logits, 2);
 
@@ -207,8 +280,7 @@ impl<B: Backend> ModelImpl<B> {
             beam_size,
             max_depth,
         );
-
-        self.decode(&tokens[..], true).map(|val| (val, length))
+        tokens
     }
 
     fn init_token(&self, lang: Language) -> TokenUtility<B> {
@@ -231,13 +303,6 @@ impl<B: Backend> ModelImpl<B> {
                 }
             })
             .collect();
-
-        let device = self.model.devices()[0].clone();
-
-        let special_tokens_maskout = Tensor::from_data(
-            Data::new(special_tokens_maskout, [vocab_size].into()).convert(),
-            &device,
-        );
 
         TokenUtility {
             inital_tokens: vec,
@@ -269,8 +334,12 @@ impl<B: Backend> ModelImpl<B> {
             .unwrap_or(false)
     }
 
+    fn tokenizer(value: impl AsRef<Path>) -> Result<Tokenizer, Error> {
+        Tokenizer::from_file(value).map_err(|err| Error::Tokenizer(err.to_string()))
+    }
+
     fn load_model(value: LocalModel, device: B::Device) -> Result<Self, Error> {
-        let tokenizer = tokenizer(&value)?;
+        let tokenizer = Self::tokenizer(&value.tokenizer)?;
 
         let cfg = WhisperModelConfig::load(value.config)?;
         let model = NamedMpkFileRecorder::<FullPrecisionSettings>::new()
@@ -314,12 +383,8 @@ impl<B: Backend> Transcribe<B> {
 }
 
 #[derive(Clone)]
-struct TokenUtility<B: Backend> {
+struct TokenUtility {
     inital_tokens: Vec<usize>,
     end_token: usize,
-    special_tokens_maskout: Tensor<B, 1>,
-}
-
-fn tokenizer(value: &LocalModel) -> Result<Tokenizer, Error> {
-    Tokenizer::from_file(&value.tokenizer).map_err(|err| Error::Tokenizer(err.to_string()))
+    special_tokens_maskout: Vec<f32>,
 }

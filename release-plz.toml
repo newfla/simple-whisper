@@ -11,6 +11,8 @@ dependencies_update = false
 # create tags for the releases
 git_tag_enable = true
 
+git_tag_name = "v{{ version }}"
+
 # disable GitHub releases
 git_release_enable = false
 
@@ -25,3 +27,5 @@ publish_allow_dirty = false
 
 # disable running `cargo-semver-checks`
 semver_check = false
+
+changelog_path = "./CHANGELOG.md"

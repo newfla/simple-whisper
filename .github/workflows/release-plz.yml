@@ -1,4 +1,4 @@
-name: Continuous Deployment
+name: Relase-Plz
 on:
   push:
     branches:

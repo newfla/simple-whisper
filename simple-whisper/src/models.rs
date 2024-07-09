@@ -6,6 +6,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
 use crate::{Error, Event};
 
+/// OpenAI supported models
 #[derive(Default, Clone, Debug, EnumIter, EnumString, Display)]
 #[strum(serialize_all = "snake_case")]
 pub enum Model {
