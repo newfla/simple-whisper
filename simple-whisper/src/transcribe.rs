@@ -283,7 +283,7 @@ impl<B: Backend> ModelImpl<B> {
         tokens
     }
 
-    fn init_token(&self, lang: Language) -> TokenUtility<B> {
+    fn init_token(&self, lang: Language) -> TokenUtility {
         let start_token = self.special_token(SpecialToken::StartOfTranscript).unwrap();
         let transcription_token = self.special_token(SpecialToken::Transcribe).unwrap();
         let lang_token = self.special_token(SpecialToken::Language(lang)).unwrap();

@@ -117,7 +117,11 @@ impl<B: Backend> AudioEncoder<B> {
     fn forward(&self, x: Tensor<B, 3>) -> Tensor<B, 3> {
         let [_, n_mels, n_ctx] = x.dims();
 
-        assert_eq!(n_mels, self.n_mels, "Audio mel spectrum size must be {}.", self.n_mels);
+        assert_eq!(
+            n_mels, self.n_mels,
+            "Audio mel spectrum size must be {}.",
+            self.n_mels
+        );
         assert!(
             n_ctx <= self.n_audio_ctx,
             "Audio length {} cannot exceed {}.",
@@ -397,7 +401,13 @@ struct MultiHeadCrossAttentionConfig {
 
 impl MultiHeadCrossAttentionConfig {
     fn init<B: Backend>(&self, device: &B::Device) -> MultiHeadCrossAttention<B> {
-        assert_eq!(self.n_state % self.n_head, 0, "State size {} must be a multiple of head size {}", self.n_state, self.n_head);
+        assert_eq!(
+            self.n_state % self.n_head,
+            0,
+            "State size {} must be a multiple of head size {}",
+            self.n_state,
+            self.n_head
+        );
 
         let n_head = self.n_head;
         let query = LinearConfig::new(self.n_state, self.n_state).init(device);
