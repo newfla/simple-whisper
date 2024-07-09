@@ -5,9 +5,9 @@ use crate::Language;
 #[derive(Debug, EnumIs, Display)]
 pub enum SpecialToken {
     #[strum(to_string = "<|endoftext|>")]
-    EndofText,
+    EndOfText,
     #[strum(to_string = "<|startoftranscript|>")]
-    StartofTranscript,
+    StartOfTranscript,
     #[strum(to_string = "<|transcribe|>")]
     Transcribe,
     #[strum(to_string = "<|notimestamps|>")]

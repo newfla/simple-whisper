@@ -160,7 +160,7 @@ fn hz_to_mel(freq: f64, htk: bool) -> f64 {
 
     let min_log_hz = 1000.0; // beginning of log region (Hz)
     let min_log_mel = (min_log_hz - f_min) / f_sp; // same (Mels)
-    let logstep = (6.4f64).ln() / 27.0; // step size for log region
+    let logstep = 6.4f64.ln() / 27.0; // step size for log region
 
     /*if frequencies.ndim:
         # If we have array data, vectorize
@@ -190,7 +190,7 @@ fn mel_to_hz_tensor<B: Backend>(mel: Tensor<B, 1>, htk: bool) -> Tensor<B, 1> {
     // And now the nonlinear scale
     let min_log_hz = 1000.0; // beginning of log region (Hz)
     let min_log_mel = (min_log_hz - f_min) / f_sp; // same (Mels)
-    let logstep = (6.4f64).ln() / 27.0; // step size for log region
+    let logstep = 6.4f64.ln() / 27.0; // step size for log region
 
     /*if mels.ndim:
         # If we have vector data, vectorize

@@ -134,17 +134,17 @@ async fn main() {
                                     }
                                 }
                             }
-                            Err(err) => println!("{err} occured\nAborting!"),
+                            Err(err) => println!("{err} occurred\nAborting!"),
                         }
                     }
                     if let Some(pb) = pb {
                         pb.finish();
                     }
                     if let Err(err) = write(output_file, segments.join("\n")).await {
-                        println!("{err} occured\nAborting!");
+                        println!("{err} occurred\nAborting!");
                     }
                 }
-                Err(err) => println!("{err} occured\nAborting!"),
+                Err(err) => println!("{err} occurred\nAborting!"),
             }
         }
         Commands::Models { sub_command } => match sub_command {

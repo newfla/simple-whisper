@@ -15,12 +15,12 @@ pub fn tensor_min<B: Backend, const D: usize>(x: Tensor<B, D>, min: Tensor<B, D>
 }
 
 pub fn tensor_log10<B: Backend, const D: usize>(x: Tensor<B, D>) -> Tensor<B, D> {
-    let ln10 = (10.0f64).ln();
+    let ln10 = 10.0f64.ln();
     x.log() / ln10
 }
 
 pub fn _10pow<B: Backend, const D: usize>(x: Tensor<B, D>) -> Tensor<B, D> {
-    let log10 = (10.0f64).ln();
+    let log10 = 10.0f64.ln();
     (x * log10).exp()
 }
 

@@ -31,7 +31,7 @@ pub enum Error {
 }
 
 impl IntoResponse for Error {
-    fn into_response(self) -> axum::response::Response {
+    fn into_response(self) -> Response {
         match self {
             Error::ModelNotSupported(_) => (StatusCode::BAD_REQUEST, format!("{self}")),
             Error::LanguageNotSupported(_) => (StatusCode::BAD_REQUEST, format!("{self}")),
@@ -218,7 +218,7 @@ async fn internal_handle_download_model(
 
     while let Some(msg) = rx.recv().await {
         socket
-            .send(axum::extract::ws::Message::Text(serde_json::to_string(
+            .send(Message::Text(serde_json::to_string(
                 &Into::<ServerResponse>::into(msg),
             )?))
             .await?;
@@ -291,7 +291,7 @@ async fn internal_handle_transcription_model(
                 Ok(msg) => {
                     if msg.is_segment() {
                         socket
-                            .send(axum::extract::ws::Message::Text(serde_json::to_string(
+                            .send(Message::Text(serde_json::to_string(
                                 &Into::<ServerResponse>::into(msg),
                             )?))
                             .await?;
@@ -395,7 +395,7 @@ mod tests {
         let listener = TcpListener::bind("127.0.0.1:5000").await.unwrap();
         spawn(serve(listener, app()).into_future());
 
-        let client = reqwest::Client::new();
+        let client = Client::new();
         let websocket = client
             .get("ws://127.0.0.1:5000/transcribe/tiny/en?force_cpu=true")
             .upgrade()
