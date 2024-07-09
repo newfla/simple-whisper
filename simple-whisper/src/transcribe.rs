@@ -184,7 +184,7 @@ impl<B: Backend> ModelImpl<B> {
         let [_, n_mel, n_ctx] = mels.dims();
 
         // the zero padding helps whisper determine end of text
-        let length = (n_ctx).min(n_ctx_max_encoder - PADDING);
+        let length = n_ctx.min(n_ctx_max_encoder - PADDING);
         let mels = Tensor::cat(
             vec![
                 mels.slice([0..1, 0..n_mel, 0..length]),
@@ -284,10 +284,10 @@ impl<B: Backend> ModelImpl<B> {
     }
 
     fn init_token(&self, lang: Language) -> TokenUtility {
-        let start_token = self.special_token(SpecialToken::StartofTranscript).unwrap();
+        let start_token = self.special_token(SpecialToken::StartOfTranscript).unwrap();
         let transcription_token = self.special_token(SpecialToken::Transcribe).unwrap();
         let lang_token = self.special_token(SpecialToken::Language(lang)).unwrap();
-        let end_token = self.special_token(SpecialToken::EndofText).unwrap();
+        let end_token = self.special_token(SpecialToken::EndOfText).unwrap();
         let notimestamp = self.special_token(SpecialToken::NoTimeStamps).unwrap();
 
         let vec = vec![start_token, lang_token, transcription_token, notimestamp];

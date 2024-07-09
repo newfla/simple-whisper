@@ -136,7 +136,7 @@ impl Model {
         }
     }
 
-    pub fn is_multilang(&self) -> bool {
+    pub fn is_multilingual(&self) -> bool {
         !self.to_string().contains("en")
     }
 

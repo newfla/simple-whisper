@@ -95,7 +95,7 @@ pub enum Event {
 impl WhisperBuilder {
     fn validate(&self) -> Result<(), WhisperBuilderError> {
         if self.language.as_ref().is_some_and(|l| !l.is_english())
-            && self.model.as_ref().is_some_and(|m| !m.is_multilang())
+            && self.model.as_ref().is_some_and(|m| !m.is_multilingual())
         {
             let err = format!(
                 "The requested language {} is not compatible with {} model",
@@ -129,7 +129,7 @@ impl Whisper {
         });
 
         spawn(async move {
-            // Download model data from Huggingface
+            // Download model data from Hugging Face
             let model = self
                 .model
                 .download_model_listener(self.progress_bar, self.force_download, tx_event)

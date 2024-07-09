@@ -117,8 +117,8 @@ impl<B: Backend> AudioEncoder<B> {
     fn forward(&self, x: Tensor<B, 3>) -> Tensor<B, 3> {
         let [_, n_mels, n_ctx] = x.dims();
 
-        assert!(
-            n_mels == self.n_mels,
+        assert_eq!(
+            n_mels, self.n_mels,
             "Audio mel spectrum size must be {}.",
             self.n_mels
         );
@@ -401,8 +401,9 @@ struct MultiHeadCrossAttentionConfig {
 
 impl MultiHeadCrossAttentionConfig {
     fn init<B: Backend>(&self, device: &B::Device) -> MultiHeadCrossAttention<B> {
-        assert!(
-            self.n_state % self.n_head == 0,
+        assert_eq!(
+            self.n_state % self.n_head,
+            0,
             "State size {} must be a multiple of head size {}",
             self.n_state,
             self.n_head
