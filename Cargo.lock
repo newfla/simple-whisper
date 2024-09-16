@@ -3933,7 +3933,7 @@ checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
 
 [[package]]
 name = "simple-whisper"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "burn",
  "cfg-if",
@@ -3949,7 +3949,7 @@ dependencies = [
 
 [[package]]
 name = "simple-whisper-cli"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap",
  "indicatif",
@@ -3960,7 +3960,7 @@ dependencies = [
 
 [[package]]
 name = "simple-whisper-server"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "axum",
