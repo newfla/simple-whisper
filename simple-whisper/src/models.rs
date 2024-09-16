@@ -279,10 +279,9 @@ async fn download_file(
         true => repo.download(file).await,
     }
     .map_err(Into::into)
-    .map(|val| {
+    .inspect(|_| {
         let _ = tx.send(Event::DownloadCompleted {
             file: file.to_owned(),
         });
-        val
     })
 }

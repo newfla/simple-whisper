@@ -32,3 +32,8 @@ tracing-subscriber.workspace = true
 futures = "0.3"
 reqwest = {version = "0.12.5", features = ["json"] }
 reqwest-websocket = "0.4.0"
+
+[features]
+default = ["burn_vulkan"]
+burn_vulkan = ["simple-whisper/burn_vulkan"]
+whisper_cpp_vulkan = ["simple-whisper/whisper_cpp_vulkan"]

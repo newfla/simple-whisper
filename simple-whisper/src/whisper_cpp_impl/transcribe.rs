@@ -97,41 +97,36 @@ fn state_builder(model: &LocalModel, force_cpu: bool) -> Result<WhisperState, Wh
 
 impl Transcribe {
     pub fn transcribe(mut self) {
-        let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 0 });
+        let tx_callback = self.tx.downgrade();
+
         let (audio, duration) = &self.audio;
         let duration = duration.clone();
         let lang = self.language.to_string();
-        
+
+        let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 0 });
         params.set_language(Some(&lang));
         params.set_print_special(false);
         params.set_print_progress(false);
         params.set_print_timestamps(false);
 
-        let tx = self.tx.clone();
-         params.set_segment_callback_safe(move |seg: SegmentCallbackData| {
-            let start_offset = Duration::from_millis(seg.start_timestamp as u64  * 10);
-            let end_offset = Duration::from_millis(seg.end_timestamp as u64  * 10);
+        params.set_segment_callback_safe(move |seg: SegmentCallbackData| {
+            let start_offset = Duration::from_millis(seg.start_timestamp as u64 * 10);
+            let end_offset = Duration::from_millis(seg.end_timestamp as u64 * 10);
             let mut percentage = end_offset.as_millis() as f32 / duration.as_millis() as f32;
             if percentage > 1. {
                 percentage = 1.;
             }
-            let seg = Event::Segment { start_offset, end_offset, percentage, transcription: seg.text };
-            println!("1111{seg:?}");
-            //let _ = tx.send(Ok(seg));
-            
+            let seg = Event::Segment {
+                start_offset,
+                end_offset,
+                percentage,
+                transcription: seg.text,
+            };
+            let _ = tx_callback.upgrade().unwrap().send(Ok(seg));
         });
 
         if let Err(err) = self.state.full(params, &audio) {
             let _ = self.tx.send(Err(Error::WhisperCppError(err)));
         }
-
-      /*   let num_segments = self.state.full_n_segments().unwrap();
-         for i in 0..num_segments {
-            let segment = self.state
-            .full_get_segment_text(i).unwrap();
-           if self.tx.send(Ok(Event::Segment { start_offset: Duration::from_secs(0), end_offset: Duration::from_secs(0), percentage: 1., transcription: segment })).is_err() {
-                break;
-           }
-        }*/
     }
 }

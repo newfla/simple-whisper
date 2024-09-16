@@ -19,3 +19,8 @@ indicatif.workspace = true
 simple-whisper = { path = "../simple-whisper"}
 strum.workspace = true
 tokio.workspace = true
+
+[features]
+default = ["burn_vulkan"]
+burn_vulkan = ["simple-whisper/burn_vulkan"]
+whisper_cpp_vulkan = ["simple-whisper/whisper_cpp_vulkan"]

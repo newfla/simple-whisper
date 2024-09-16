@@ -284,7 +284,7 @@ mod tests {
     #[tokio::test]
     async fn simple_transcribe_ok() {
         let mut rx = WhisperBuilder::default()
-            .language(Language::Italian)
+            .language(Language::English)
             .model(Model::Tiny)
             .progress_bar(true)
             .force_cpu(false)
