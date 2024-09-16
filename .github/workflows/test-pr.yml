@@ -45,6 +45,10 @@ jobs:
       - name: run generic tests
         run: cargo test
     
-      - name: run inference tests
+      - name: run burn inference tests
         if: matrix.platform == 'macos-latest'
         run: cargo test --release -- --ignored
+
+      - name: run whisper-rs inference tests
+        if: matrix.platform == 'macos-latest'
+        run: cargo test --release --features whisper_cpp_vulkan -- --ignored
