@@ -291,7 +291,7 @@ mod tests {
             .build()
             .unwrap()
             .transcribe(test_file!("samples_jfk.wav"));
-        
+
         while let Some(msg) = rx.recv().await {
             assert!(msg.is_ok());
             println!("{msg:?}");
