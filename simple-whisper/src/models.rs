@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use cfg_if::cfg_if;
 use hf_hub::{api::tokio::ApiRepo, Repo};
 use strum::{Display, EnumIter, EnumString};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
@@ -47,93 +48,175 @@ pub enum Model {
 }
 struct HFCoordinates {
     repo: Repo,
-    config: String,
+    config: Option<String>,
     model: String,
-    tokenizer: String,
+    tokenizer: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct LocalModel {
-    pub config: PathBuf,
+    pub config: Option<PathBuf>,
     pub model: PathBuf,
-    pub tokenizer: PathBuf,
+    pub tokenizer: Option<PathBuf>,
+    pub model_type: Model,
 }
 
 impl Model {
-    fn hf_coordinates(&self) -> HFCoordinates {
-        let repo = Repo::with_revision(
-            "newfla/simple-whisper".to_owned(),
-            hf_hub::RepoType::Model,
-            "main".to_owned(),
-        );
-        match self {
-            Model::Tiny => HFCoordinates {
-                repo,
-                config: "tiny/tiny.cfg".to_owned(),
-                model: "tiny/tiny.mpk".to_owned(),
-                tokenizer: "tiny/tokenizer.json".to_owned(),
-            },
-            Model::TinyEn => HFCoordinates {
-                repo,
-                config: "tiny_en/tiny_en.cfg".to_owned(),
-                model: "tiny_en/tiny_en.mpk".to_owned(),
-                tokenizer: "tiny_en/tokenizer.json".to_owned(),
-            },
-            Model::Base => HFCoordinates {
-                repo,
-                config: "base/base.cfg".to_owned(),
-                model: "base/base.mpk".to_owned(),
-                tokenizer: "base/tokenizer.json".to_owned(),
-            },
-            Model::BaseEn => HFCoordinates {
-                repo,
-                config: "base_en/base_en.cfg".to_owned(),
-                model: "base_en/base_en.mpk".to_owned(),
-                tokenizer: "tiny/tokenizer.json".to_owned(),
-            },
-            Model::Small => HFCoordinates {
-                repo,
-                config: "small/small.cfg".to_owned(),
-                model: "small/small.mpk".to_owned(),
-                tokenizer: "small/tokenizer.json".to_owned(),
-            },
-            Model::SmallEn => HFCoordinates {
-                repo,
-                config: "small_en/small_en.cfg".to_owned(),
-                model: "small_en/small_en.mpk".to_owned(),
-                tokenizer: "small_en/tokenizer.json".to_owned(),
-            },
-            Model::Medium => HFCoordinates {
-                repo,
-                config: "medium/medium.cfg".to_owned(),
-                model: "medium/medium.mpk".to_owned(),
-                tokenizer: "medium/tokenizer.json".to_owned(),
-            },
-            Model::MediumEn => HFCoordinates {
-                repo,
-                config: "medium_en/medium_en.cfg".to_owned(),
-                model: "medium_en/medium_en.mpk".to_owned(),
-                tokenizer: "medium_en/tokenizer.json".to_owned(),
-            },
-            Model::Large => HFCoordinates {
-                repo,
-                config: "large-v1/large-v1.cfg".to_owned(),
-                model: "large-v1/large-v1.mpk".to_owned(),
-                tokenizer: "large-v1/tokenizer.json".to_owned(),
-            },
-            Model::LargeV2 => HFCoordinates {
-                repo,
-                config: "large-v2/large-v2.cfg".to_owned(),
-                model: "large-v2/large-v2.mpk".to_owned(),
-                tokenizer: "large-v2/tokenizer.json".to_owned(),
-            },
-            Model::LargeV3 => HFCoordinates {
-                repo,
-                config: "large-v3/large-v3.cfg".to_owned(),
-                model: "large-v3/large-v3.mpk".to_owned(),
-                tokenizer: "large-v3/tokenizer.json".to_owned(),
-            },
+    cfg_if! {
+        if #[cfg(feature = "burn_vulkan")] {
+            fn hf_coordinates(&self) -> HFCoordinates {
+                let repo = Repo::with_revision(
+                    "newfla/simple-whisper".to_owned(),
+                    hf_hub::RepoType::Model,
+                    "main".to_owned(),
+                );
+                match self {
+                    Model::Tiny => HFCoordinates {
+                        repo,
+                        config: Some("tiny/tiny.cfg".to_owned()),
+                        model: "tiny/tiny.mpk".to_owned(),
+                        tokenizer: Some("tiny/tokenizer.json".to_owned()),
+                    },
+                    Model::TinyEn => HFCoordinates {
+                        repo,
+                        config: Some("tiny_en/tiny_en.cfg".to_owned()),
+                        model: "tiny_en/tiny_en.mpk".to_owned(),
+                        tokenizer: Some("tiny_en/tokenizer.json".to_owned()),
+                    },
+                    Model::Base => HFCoordinates {
+                        repo,
+                        config: Some("base/base.cfg".to_owned()),
+                        model: "base/base.mpk".to_owned(),
+                        tokenizer: Some("base/tokenizer.json".to_owned()),
+                    },
+                    Model::BaseEn => HFCoordinates {
+                        repo,
+                        config: Some("base_en/base_en.cfg".to_owned()),
+                        model: "base_en/base_en.mpk".to_owned(),
+                        tokenizer: Some("tiny/tokenizer.json".to_owned()),
+                    },
+                    Model::Small => HFCoordinates {
+                        repo,
+                        config: Some("small/small.cfg".to_owned()),
+                        model: "small/small.mpk".to_owned(),
+                        tokenizer: Some("small/tokenizer.json".to_owned()),
+                    },
+                    Model::SmallEn => HFCoordinates {
+                        repo,
+                        config: Some("small_en/small_en.cfg".to_owned()),
+                        model: "small_en/small_en.mpk".to_owned(),
+                        tokenizer: Some("small_en/tokenizer.json".to_owned()),
+                    },
+                    Model::Medium => HFCoordinates {
+                        repo,
+                        config: Some("medium/medium.cfg".to_owned()),
+                        model: "medium/medium.mpk".to_owned(),
+                        tokenizer: Some("medium/tokenizer.json".to_owned()),
+                    },
+                    Model::MediumEn => HFCoordinates {
+                        repo,
+                        config: Some("medium_en/medium_en.cfg".to_owned()),
+                        model: "medium_en/medium_en.mpk".to_owned(),
+                        tokenizer: Some("medium_en/tokenizer.json".to_owned()),
+                    },
+                    Model::Large => HFCoordinates {
+                        repo,
+                        config: Some("large-v1/large-v1.cfg".to_owned()),
+                        model: "large-v1/large-v1.mpk".to_owned(),
+                        tokenizer: Some("large-v1/tokenizer.json".to_owned()),
+                    },
+                    Model::LargeV2 => HFCoordinates {
+                        repo,
+                        config: Some("large-v2/large-v2.cfg".to_owned()),
+                        model: "large-v2/large-v2.mpk".to_owned(),
+                        tokenizer: Some("large-v2/tokenizer.json".to_owned()),
+                    },
+                    Model::LargeV3 => HFCoordinates {
+                        repo,
+                        config: Some("large-v3/large-v3.cfg".to_owned()),
+                        model: "large-v3/large-v3.mpk".to_owned(),
+                        tokenizer: Some("large-v3/tokenizer.json".to_owned()),
+                    },
+                }
+            }
+        } else if #[cfg(feature = "whisper_cpp_vulkan")] {
+            fn hf_coordinates(&self) -> HFCoordinates {
+                let repo = Repo::with_revision(
+                    "ggerganov/whisper.cpp".to_owned(),
+                    hf_hub::RepoType::Model,
+                    "main".to_owned(),
+                );
+                match self {
+                    Model::Tiny => HFCoordinates {
+                        repo,
+                        config: None,
+                        model: "ggml-tiny.bin".to_owned(),
+                        tokenizer: None,
+                    },
+                    Model::TinyEn => HFCoordinates {
+                        repo,
+                        config: None,
+                        model: "ggml-tiny.en.bin".to_owned(),
+                        tokenizer: None,
+                    },
+                    Model::Base => HFCoordinates {
+                        repo,
+                        config: None,
+                        model: "ggml-base.bin".to_owned(),
+                        tokenizer: None,
+                    },
+                    Model::BaseEn => HFCoordinates {
+                        repo,
+                        config: None,
+                        model: "ggml-base.en.bin".to_owned(),
+                        tokenizer: None,
+                    },
+                    Model::Small => HFCoordinates {
+                        repo,
+                        config: None,
+                        model: "ggml-small.bin".to_owned(),
+                        tokenizer: None,
+                    },
+                    Model::SmallEn => HFCoordinates {
+                        repo,
+                        config: None,
+                        model: "ggml-small.en.bin".to_owned(),
+                        tokenizer: None,
+                    },
+                    Model::Medium => HFCoordinates {
+                        repo,
+                        config: None,
+                        model: "ggml-medium.bin".to_owned(),
+                        tokenizer: None,
+                    },
+                    Model::MediumEn => HFCoordinates {
+                        repo,
+                        config: None,
+                        model: "ggml-medium.en.bin".to_owned(),
+                        tokenizer: None,
+                    },
+                    Model::Large => HFCoordinates {
+                        repo,
+                        config: None,
+                        model: "ggml-large-v1.bin".to_owned(),
+                        tokenizer: None,
+                    },
+                    Model::LargeV2 => HFCoordinates {
+                        repo,
+                        config: None,
+                        model: "ggml-large-v2.bin".to_owned(),
+                        tokenizer: None,
+                    },
+                    Model::LargeV3 => HFCoordinates {
+                        repo,
+                        config: None,
+                        model: "ggml-large-v3.bin".to_owned(),
+                        tokenizer: None,
+                    },
+                }
+            }
         }
+
     }
 
     pub fn is_multilingual(&self) -> bool {
@@ -152,13 +235,22 @@ impl Model {
             .build()
             .map(|api| api.repo(coordinates.repo))
             .map_err(Into::<Error>::into)?;
-        let tokenizer = download_file(&coordinates.tokenizer, force_download, &tx, &repo).await?;
-        let config = download_file(&coordinates.config, force_download, &tx, &repo).await?;
+        let tokenizer = if let Some(val) = coordinates.tokenizer {
+            Some(download_file(&val, force_download, &tx, &repo).await?)
+        } else {
+            None
+        };
+        let config = if let Some(val) = coordinates.config {
+            Some(download_file(&val, force_download, &tx, &repo).await?)
+        } else {
+            None
+        };
         let model = download_file(&coordinates.model, force_download, &tx, &repo).await?;
         Ok(LocalModel {
             config,
             model,
             tokenizer,
+            model_type: self.clone(),
         })
     }
 

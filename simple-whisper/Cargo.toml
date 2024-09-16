@@ -11,7 +11,9 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-burn.workspace = true
+cfg-if.workspace = true
+burn = { version="0.13.2", features=["wgpu", "ndarray","fusion"], optional = true}
+whisper-rs = {git = "https://github.com/tazz4843/whisper-rs", optional = true} #features = ["vulkan"], optional = true}
 derive_builder.workspace = true
 hf-hub.workspace = true
 rodio.workspace = true
@@ -19,3 +21,8 @@ strum.workspace = true
 thiserror.workspace = true
 tokenizers.workspace = true
 tokio.workspace = true
+
+[features]
+default = ["burn_vulkan"]
+burn_vulkan = ["dep:burn"]
+whisper_cpp_vulkan = ["dep:whisper-rs"]
