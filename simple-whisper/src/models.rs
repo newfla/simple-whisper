@@ -63,83 +63,7 @@ pub struct LocalModel {
 
 impl Model {
     cfg_if! {
-        if #[cfg(feature = "burn_vulkan")] {
-            fn hf_coordinates(&self) -> HFCoordinates {
-                let repo = Repo::with_revision(
-                    "newfla/simple-whisper".to_owned(),
-                    hf_hub::RepoType::Model,
-                    "main".to_owned(),
-                );
-                match self {
-                    Model::Tiny => HFCoordinates {
-                        repo,
-                        config: Some("tiny/tiny.cfg".to_owned()),
-                        model: "tiny/tiny.mpk".to_owned(),
-                        tokenizer: Some("tiny/tokenizer.json".to_owned()),
-                    },
-                    Model::TinyEn => HFCoordinates {
-                        repo,
-                        config: Some("tiny_en/tiny_en.cfg".to_owned()),
-                        model: "tiny_en/tiny_en.mpk".to_owned(),
-                        tokenizer: Some("tiny_en/tokenizer.json".to_owned()),
-                    },
-                    Model::Base => HFCoordinates {
-                        repo,
-                        config: Some("base/base.cfg".to_owned()),
-                        model: "base/base.mpk".to_owned(),
-                        tokenizer: Some("base/tokenizer.json".to_owned()),
-                    },
-                    Model::BaseEn => HFCoordinates {
-                        repo,
-                        config: Some("base_en/base_en.cfg".to_owned()),
-                        model: "base_en/base_en.mpk".to_owned(),
-                        tokenizer: Some("tiny/tokenizer.json".to_owned()),
-                    },
-                    Model::Small => HFCoordinates {
-                        repo,
-                        config: Some("small/small.cfg".to_owned()),
-                        model: "small/small.mpk".to_owned(),
-                        tokenizer: Some("small/tokenizer.json".to_owned()),
-                    },
-                    Model::SmallEn => HFCoordinates {
-                        repo,
-                        config: Some("small_en/small_en.cfg".to_owned()),
-                        model: "small_en/small_en.mpk".to_owned(),
-                        tokenizer: Some("small_en/tokenizer.json".to_owned()),
-                    },
-                    Model::Medium => HFCoordinates {
-                        repo,
-                        config: Some("medium/medium.cfg".to_owned()),
-                        model: "medium/medium.mpk".to_owned(),
-                        tokenizer: Some("medium/tokenizer.json".to_owned()),
-                    },
-                    Model::MediumEn => HFCoordinates {
-                        repo,
-                        config: Some("medium_en/medium_en.cfg".to_owned()),
-                        model: "medium_en/medium_en.mpk".to_owned(),
-                        tokenizer: Some("medium_en/tokenizer.json".to_owned()),
-                    },
-                    Model::Large => HFCoordinates {
-                        repo,
-                        config: Some("large-v1/large-v1.cfg".to_owned()),
-                        model: "large-v1/large-v1.mpk".to_owned(),
-                        tokenizer: Some("large-v1/tokenizer.json".to_owned()),
-                    },
-                    Model::LargeV2 => HFCoordinates {
-                        repo,
-                        config: Some("large-v2/large-v2.cfg".to_owned()),
-                        model: "large-v2/large-v2.mpk".to_owned(),
-                        tokenizer: Some("large-v2/tokenizer.json".to_owned()),
-                    },
-                    Model::LargeV3 => HFCoordinates {
-                        repo,
-                        config: Some("large-v3/large-v3.cfg".to_owned()),
-                        model: "large-v3/large-v3.mpk".to_owned(),
-                        tokenizer: Some("large-v3/tokenizer.json".to_owned()),
-                    },
-                }
-            }
-        } else if #[cfg(feature = "whisper_cpp_vulkan")] {
+        if #[cfg(feature = "whisper_cpp_vulkan")] {
             fn hf_coordinates(&self) -> HFCoordinates {
                 let repo = Repo::with_revision(
                     "ggerganov/whisper.cpp".to_owned(),
@@ -215,8 +139,83 @@ impl Model {
                     },
                 }
             }
+        } else if #[cfg(feature = "burn_vulkan")] {
+            fn hf_coordinates(&self) -> HFCoordinates {
+                let repo = Repo::with_revision(
+                    "newfla/simple-whisper".to_owned(),
+                    hf_hub::RepoType::Model,
+                    "main".to_owned(),
+                );
+                match self {
+                    Model::Tiny => HFCoordinates {
+                        repo,
+                        config: Some("tiny/tiny.cfg".to_owned()),
+                        model: "tiny/tiny.mpk".to_owned(),
+                        tokenizer: Some("tiny/tokenizer.json".to_owned()),
+                    },
+                    Model::TinyEn => HFCoordinates {
+                        repo,
+                        config: Some("tiny_en/tiny_en.cfg".to_owned()),
+                        model: "tiny_en/tiny_en.mpk".to_owned(),
+                        tokenizer: Some("tiny_en/tokenizer.json".to_owned()),
+                    },
+                    Model::Base => HFCoordinates {
+                        repo,
+                        config: Some("base/base.cfg".to_owned()),
+                        model: "base/base.mpk".to_owned(),
+                        tokenizer: Some("base/tokenizer.json".to_owned()),
+                    },
+                    Model::BaseEn => HFCoordinates {
+                        repo,
+                        config: Some("base_en/base_en.cfg".to_owned()),
+                        model: "base_en/base_en.mpk".to_owned(),
+                        tokenizer: Some("tiny/tokenizer.json".to_owned()),
+                    },
+                    Model::Small => HFCoordinates {
+                        repo,
+                        config: Some("small/small.cfg".to_owned()),
+                        model: "small/small.mpk".to_owned(),
+                        tokenizer: Some("small/tokenizer.json".to_owned()),
+                    },
+                    Model::SmallEn => HFCoordinates {
+                        repo,
+                        config: Some("small_en/small_en.cfg".to_owned()),
+                        model: "small_en/small_en.mpk".to_owned(),
+                        tokenizer: Some("small_en/tokenizer.json".to_owned()),
+                    },
+                    Model::Medium => HFCoordinates {
+                        repo,
+                        config: Some("medium/medium.cfg".to_owned()),
+                        model: "medium/medium.mpk".to_owned(),
+                        tokenizer: Some("medium/tokenizer.json".to_owned()),
+                    },
+                    Model::MediumEn => HFCoordinates {
+                        repo,
+                        config: Some("medium_en/medium_en.cfg".to_owned()),
+                        model: "medium_en/medium_en.mpk".to_owned(),
+                        tokenizer: Some("medium_en/tokenizer.json".to_owned()),
+                    },
+                    Model::Large => HFCoordinates {
+                        repo,
+                        config: Some("large-v1/large-v1.cfg".to_owned()),
+                        model: "large-v1/large-v1.mpk".to_owned(),
+                        tokenizer: Some("large-v1/tokenizer.json".to_owned()),
+                    },
+                    Model::LargeV2 => HFCoordinates {
+                        repo,
+                        config: Some("large-v2/large-v2.cfg".to_owned()),
+                        model: "large-v2/large-v2.mpk".to_owned(),
+                        tokenizer: Some("large-v2/tokenizer.json".to_owned()),
+                    },
+                    Model::LargeV3 => HFCoordinates {
+                        repo,
+                        config: Some("large-v3/large-v3.cfg".to_owned()),
+                        model: "large-v3/large-v3.mpk".to_owned(),
+                        tokenizer: Some("large-v3/tokenizer.json".to_owned()),
+                    },
+                }
+            }
         }
-
     }
 
     pub fn is_multilingual(&self) -> bool {

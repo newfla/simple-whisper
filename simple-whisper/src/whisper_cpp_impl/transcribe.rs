@@ -126,7 +126,7 @@ impl Transcribe {
         });
 
         if let Err(err) = self.state.full(params, &audio) {
-            let _ = self.tx.send(Err(Error::WhisperCppError(err)));
+            let _ = self.tx.send(Err(Error::Whisper(err)));
         }
     }
 }
