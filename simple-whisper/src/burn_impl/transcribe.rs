@@ -339,9 +339,9 @@ impl<B: Backend> ModelImpl<B> {
     }
 
     fn load_model(value: LocalModel, device: B::Device) -> Result<Self, Error> {
-        let tokenizer = Self::tokenizer(&value.tokenizer)?;
+        let tokenizer = Self::tokenizer(value.tokenizer.as_ref().unwrap())?;
 
-        let cfg = WhisperModelConfig::load(value.config)?;
+        let cfg = WhisperModelConfig::load(value.config.as_ref().unwrap())?;
         let model = NamedMpkFileRecorder::<FullPrecisionSettings>::new()
             .load(value.model, &device)
             .map(|record| cfg.init(&device).load_record(record))?;
