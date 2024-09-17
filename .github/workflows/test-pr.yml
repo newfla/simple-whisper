@@ -49,13 +49,13 @@ jobs:
       - name: check burn build
         run: cargo build 
 
+      - name: run whisper-rs vulkan inference tests
+        if: matrix.platform == 'macos-latest'
+        run: cargo build --features whisper_cpp_vulkan
+      
       - name: run generic tests
         run: cargo test
     
       - name: run burn inference tests
         if: matrix.platform == 'macos-latest'
         run: cargo test --release -- --ignored
-
-      - name: run whisper-rs vulkan inference tests
-        if: matrix.platform == 'macos-latest'
-        run: export DYLD_LIBRARY_PATH=$VULKAN_SDK/lib:$DYLD_LIBRARY_PATH && cargo test --release --features whisper_cpp_vulkan -- --ignored
