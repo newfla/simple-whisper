@@ -5115,7 +5115,7 @@ dependencies = [
 [[package]]
 name = "whisper-rs"
 version = "0.13.0"
-source = "git+https://github.com/tazz4843/whisper-rs#d8b6aefe067d5d58f56a033e4a36268c8064de3b"
+source = "git+https://github.com/newfla/whisper-rs?branch=fix_vulkan_macos#d12415237627b55bafd055ee3d49753b87a73c88"
 dependencies = [
  "whisper-rs-sys",
 ]
@@ -5123,7 +5123,7 @@ dependencies = [
 [[package]]
 name = "whisper-rs-sys"
 version = "0.11.0"
-source = "git+https://github.com/tazz4843/whisper-rs#d8b6aefe067d5d58f56a033e4a36268c8064de3b"
+source = "git+https://github.com/newfla/whisper-rs?branch=fix_vulkan_macos#d12415237627b55bafd055ee3d49753b87a73c88"
 dependencies = [
  "bindgen",
  "cfg-if",
