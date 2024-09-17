@@ -46,7 +46,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
-      - name: check build
+      - name: check burn build
         run: cargo build 
 
       - name: run generic tests
@@ -54,8 +54,8 @@ jobs:
     
       - name: run burn inference tests
         if: matrix.platform == 'macos-latest'
-        run: export DYLD_LIBRARY_PATH=$VULKAN_SDK/lib:$DYLD_LIBRARY_PATH && cargo test --release -- --ignored
+        run: cargo test --release -- --ignored
 
       - name: run whisper-rs vulkan inference tests
         if: matrix.platform == 'macos-latest'
-        run: cargo test --release --features whisper_cpp_vulkan -- --ignored
+        run: export DYLD_LIBRARY_PATH=$VULKAN_SDK/lib:$DYLD_LIBRARY_PATH && cargo test --release --features whisper_cpp_vulkan -- --ignored
