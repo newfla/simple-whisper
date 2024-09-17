@@ -54,7 +54,7 @@ jobs:
     
       - name: run burn inference tests
         if: matrix.platform == 'macos-latest'
-        run: cargo test --release -- --ignored
+        run: export DYLD_LIBRARY_PATH=$VULKAN_SDK/lib:$DYLD_LIBRARY_PATH && cargo test --release -- --ignored
 
       - name: run whisper-rs vulkan inference tests
         if: matrix.platform == 'macos-latest'
