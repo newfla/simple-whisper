@@ -33,6 +33,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libasound2-dev
 
+      - name: install vulkan sdk
+        if: matrix.platform == 'macos-latest'
+        uses: humbletim/install-vulkan-sdk@v1.1.1
+        with:
+          version: latest
+          cache: true
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -45,6 +52,10 @@ jobs:
       - name: run generic tests
         run: cargo test
     
-      - name: run inference tests
+      - name: run burn inference tests
         if: matrix.platform == 'macos-latest'
         run: cargo test --release -- --ignored
+
+      - name: run whisper-rs vulkan inference tests
+        if: matrix.platform == 'macos-latest'
+        run: cargo test --release --features whisper_cpp_vulkan -- --ignored
