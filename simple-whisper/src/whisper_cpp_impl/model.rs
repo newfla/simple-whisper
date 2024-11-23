@@ -97,13 +97,22 @@ pub enum Model {
     #[strum(serialize = "large_v3-q5_0", to_string = "Large V3 - large_v3-q5_0")]
     LargeV3Q5_0,
     /// The large model v3 turbo.
-    #[strum(serialize = "large_v3_turbo", to_string = "Large V3 Turbo - large_v3_turbo")]
+    #[strum(
+        serialize = "large_v3_turbo",
+        to_string = "Large V3 Turbo - large_v3_turbo"
+    )]
     LargeV3Turbo,
     /// The large_v3_turbo-q5_0 model v3 turbo.
-    #[strum(serialize = "large_v3_turbo-q5_0", to_string = "Large V3 Turbo - large_v3_turbo-q5_0")]
+    #[strum(
+        serialize = "large_v3_turbo-q5_0",
+        to_string = "Large V3 Turbo - large_v3_turbo-q5_0"
+    )]
     LargeV3TurboQ5_0,
     /// The large_v3_turbo-q8_0 model v3 turbo.
-    #[strum(serialize = "large_v3_turbo-q8_0", to_string = "Large V3 Turbo - large_v3_turbo-q8_0")]
+    #[strum(
+        serialize = "large_v3_turbo-q8_0",
+        to_string = "Large V3 Turbo - large_v3_turbo-q8_0"
+    )]
     LargeV3TurboQ8_0,
 }
 
