@@ -18,7 +18,7 @@ use crate::{
         token::SpecialToken,
         whisper::{WhisperModel, WhisperModelConfig},
     },
-    models::LocalModel,
+    model::LocalModel,
     Error, Event, Language, SAMPLE_RATE,
 };
 

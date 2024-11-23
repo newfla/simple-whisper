@@ -51,7 +51,7 @@ jobs:
 
       - name: check whisper-rs vulkan build
         if: matrix.platform == 'macos-latest'
-        run: cargo build --features whisper_cpp_vulkan
+        run: cargo build --no-default-features --features whisper_cpp_vulkan
       
       - name: run generic tests
         run: cargo test

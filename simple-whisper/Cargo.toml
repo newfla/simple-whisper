@@ -23,6 +23,6 @@ tokenizers.workspace = true
 tokio.workspace = true
 
 [features]
-default = ["burn_vulkan"]
+default = ["whisper_cpp_vulkan"]
 burn_vulkan = ["dep:burn"]
 whisper_cpp_vulkan = ["dep:whisper-rs"]
