@@ -8,11 +8,11 @@ use std::{
 
 use cfg_if::cfg_if;
 use derive_builder::Builder;
-mod languages;
-mod models;
+mod language;
+mod model;
 
-pub use languages::Language;
-pub use models::Model;
+pub use language::Language;
+
 use rodio::{source::UniformSourceIterator, Decoder, Source};
 use strum::{Display, EnumIs};
 use thiserror::Error;
@@ -30,10 +30,12 @@ cfg_if! {
         mod whisper_cpp_impl;
         use whisper_cpp_impl::transcribe::{TranscribeBuilder, TranscribeBuilderError};
         use whisper_rs::WhisperError;
+        pub use whisper_cpp_impl::model::Model as Model;
     } else if #[cfg(feature = "burn_vulkan")] {
         mod burn_impl;
         use burn_impl::transcribe::{TranscribeBuilder, TranscribeBuilderError};
         use burn::backend::{NdArray, Wgpu};
+        pub use burn_impl::model::Model as Model;
     }
 }
 

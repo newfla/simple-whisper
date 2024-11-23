@@ -7,7 +7,7 @@ use whisper_rs::{
     WhisperContext, WhisperContextParameters, WhisperError, WhisperState,
 };
 
-use crate::{models::LocalModel, Error, Event, Language};
+use crate::{model::LocalModel, Error, Event, Language};
 
 #[derive(Builder)]
 #[builder(
@@ -85,6 +85,28 @@ fn state_builder(model: &LocalModel, force_cpu: bool) -> Result<WhisperState, Wh
             crate::Model::Large => DtwModelPreset::LargeV1,
             crate::Model::LargeV2 => DtwModelPreset::LargeV2,
             crate::Model::LargeV3 => DtwModelPreset::LargeV3,
+            crate::Model::TinyQ5_1 => DtwModelPreset::Tiny,
+            crate::Model::TinyQ8_0 => DtwModelPreset::Tiny,
+            crate::Model::TinyEnQ5_1 => DtwModelPreset::TinyEn,
+            crate::Model::TinyEnQ8_0 => DtwModelPreset::TinyEn,
+            crate::Model::BaseQ5_1 => DtwModelPreset::Base,
+            crate::Model::BaseQ8_0 => DtwModelPreset::Base,
+            crate::Model::BaseEnQ5_1 => DtwModelPreset::BaseEn,
+            crate::Model::BaseEnQ8_0 => DtwModelPreset::BaseEn,
+            crate::Model::SmallQ5_1 => DtwModelPreset::Small,
+            crate::Model::SmallQ8_0 => DtwModelPreset::Small,
+            crate::Model::SmallEnQ5_1 => DtwModelPreset::SmallEn,
+            crate::Model::SmallEnQ8_0 => DtwModelPreset::SmallEn,
+            crate::Model::MediumQ5_0 => DtwModelPreset::Medium,
+            crate::Model::MediumQ8_0 => DtwModelPreset::Medium,
+            crate::Model::MediumEnQ5_0 => DtwModelPreset::MediumEn,
+            crate::Model::MediumEnQ8_0 => DtwModelPreset::MediumEn,
+            crate::Model::LargeV2Q5_0 => DtwModelPreset::LargeV2,
+            crate::Model::LargeV2Q8_0 => DtwModelPreset::LargeV2,
+            crate::Model::LargeV3Q5_0 => DtwModelPreset::LargeV3,
+            crate::Model::LargeV3Turbo => todo!(),
+            crate::Model::LargeV3TurboQ5_0 => todo!(),
+            crate::Model::LargeV3TurboQ8_0 => todo!(),
         },
     };
 
@@ -100,7 +122,7 @@ impl Transcribe {
         let tx_callback = self.tx.downgrade();
 
         let (audio, duration) = &self.audio;
-        let duration = duration.clone();
+        let duration = *duration;
         let lang = self.language.to_string();
 
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 0 });
@@ -125,7 +147,7 @@ impl Transcribe {
             let _ = tx_callback.upgrade().unwrap().send(Ok(seg));
         });
 
-        if let Err(err) = self.state.full(params, &audio) {
+        if let Err(err) = self.state.full(params, audio) {
             let _ = self.tx.send(Err(Error::Whisper(err)));
         }
     }
