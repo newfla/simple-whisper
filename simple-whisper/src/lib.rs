@@ -143,15 +143,21 @@ impl WhisperBuilder {
 }
 
 impl Whisper {
-    /// Transcribe an audio file into text.
+    /// Transcribe an raw audio buffer into text.
     pub fn transcribe(self, path: impl AsRef<Path>) -> UnboundedReceiver<Result<Event, Error>> {
+        let audio = Self::load_audio(path.as_ref().into());
+        self.transcribe_raw(audio)
+    }
+
+    pub fn transcribe_raw(
+        self,
+        audio: Result<AudioData, Error>,
+    ) -> UnboundedReceiver<Result<Event, Error>> {
         let (tx, rx) = unbounded_channel();
         let (tx_event, mut rx_event) = unbounded_channel();
 
         let wait_download = Barrier::default();
         let download_completed = wait_download.clone();
-
-        let path = path.as_ref().into();
 
         // Download events forwarder
         let tx_forwarder = tx.clone();
@@ -171,9 +177,6 @@ impl Whisper {
             download_completed.notified().await;
 
             spawn_blocking(move || {
-                // Load audio file
-                let audio = Self::load_audio(path);
-
                 if model.is_err() {
                     let _ = tx.send(Err(model.unwrap_err()));
                 } else if audio.is_err() {
