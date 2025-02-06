@@ -143,12 +143,13 @@ impl WhisperBuilder {
 }
 
 impl Whisper {
-    /// Transcribe an raw audio buffer into text.
+    /// Transcribe a raw audio buffer into text.
     pub fn transcribe(self, path: impl AsRef<Path>) -> UnboundedReceiver<Result<Event, Error>> {
         let audio = Self::load_audio(path.as_ref().into());
         self.transcribe_raw(audio)
     }
 
+    /// Transcribe an audio file into text.
     pub fn transcribe_raw(
         self,
         audio: Result<AudioData, Error>,
