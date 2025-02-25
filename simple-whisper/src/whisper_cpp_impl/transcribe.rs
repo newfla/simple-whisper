@@ -104,9 +104,9 @@ fn state_builder(model: &LocalModel, force_cpu: bool) -> Result<WhisperState, Wh
             crate::Model::LargeV2Q5_0 => DtwModelPreset::LargeV2,
             crate::Model::LargeV2Q8_0 => DtwModelPreset::LargeV2,
             crate::Model::LargeV3Q5_0 => DtwModelPreset::LargeV3,
-            crate::Model::LargeV3Turbo => todo!(),
-            crate::Model::LargeV3TurboQ5_0 => todo!(),
-            crate::Model::LargeV3TurboQ8_0 => todo!(),
+            crate::Model::LargeV3Turbo => DtwModelPreset::LargeV3Turbo,
+            crate::Model::LargeV3TurboQ5_0 => DtwModelPreset::LargeV3Turbo,
+            crate::Model::LargeV3TurboQ8_0 => DtwModelPreset::LargeV3Turbo,
         },
     };
 
