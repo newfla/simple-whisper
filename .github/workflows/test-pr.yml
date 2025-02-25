@@ -49,10 +49,10 @@ jobs:
       - name: run generic tests
         run: cargo test
 
-      - name: cargo build
+      - name: cargo build (metal)
         if: matrix.platform == 'macos-latest'
         run: cargo build --features metal
       
-      - name: run generic tests
+      - name: run generic tests (metal)
         if: matrix.platform == 'macos-latest'
         run: cargo test --features metal
