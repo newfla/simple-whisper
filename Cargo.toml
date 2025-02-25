@@ -12,13 +12,12 @@ version = "0.1.2"
 authors = ["Flavio Bizzarri <fl.bizzarri@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/newfla/simple-whisper"
-keywords = ["ai", "whisper", "burn"]
+keywords = ["ai", "whisper"]
 categories = ["science","multimedia"]
 
 [workspace.dependencies]
 anyhow = "1.0.86"
 axum = { version = "0.7.5", features = ["json", "ws"] }
-cfg-if = "1.0.0"
 clap = { version = "4.5.7", features = ["derive"] }
 derive_builder = "0.20.0"
 hf-hub = { version = "0.3.2", features = ["tokio"] }
