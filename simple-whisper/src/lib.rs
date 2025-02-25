@@ -39,6 +39,7 @@ cfg_if! {
     }
 }
 
+type AudioData = (Vec<f32>, Duration);
 type Barrier = Arc<Notify>;
 
 pub(crate) const SAMPLE_RATE: u32 = 16000;
@@ -144,15 +145,22 @@ impl WhisperBuilder {
 }
 
 impl Whisper {
-    /// Transcribe an audio file into text.
+    /// Transcribe a raw audio buffer into text.
     pub fn transcribe(self, path: impl AsRef<Path>) -> UnboundedReceiver<Result<Event, Error>> {
+        let audio = Self::load_audio(path.as_ref().into());
+        self.transcribe_raw(audio)
+    }
+
+    /// Transcribe an audio file into text.
+    pub fn transcribe_raw(
+        self,
+        audio: Result<AudioData, Error>,
+    ) -> UnboundedReceiver<Result<Event, Error>> {
         let (tx, rx) = unbounded_channel();
         let (tx_event, mut rx_event) = unbounded_channel();
 
         let wait_download = Barrier::default();
         let download_completed = wait_download.clone();
-
-        let path = path.as_ref().into();
 
         // Download events forwarder
         let tx_forwarder = tx.clone();
@@ -172,63 +180,56 @@ impl Whisper {
             download_completed.notified().await;
 
             spawn_blocking(move || {
-                // Load audio file
-                let audio = Self::load_audio(path);
-
-                match audio.map(|audio| (audio, model)) {
-                    Ok((audio, Ok(model_files))) => {
-                        cfg_if! {
-                            if #[cfg(feature = "whisper_cpp_vulkan")] {
-                                match TranscribeBuilder::default()
-                                .language(self.language)
-                                .audio(audio)
-                                .force_cpu(self.force_cpu)
-                                .tx(tx.clone())
-                                .model(model_files)
-                                .build() {
+                if model.is_err() {
+                    let _ = tx.send(Err(model.unwrap_err()));
+                } else if audio.is_err() {
+                    let _ = tx.send(Err(model.unwrap_err()));
+                } else {
+                    cfg_if! {
+                        if #[cfg(feature = "whisper_cpp_vulkan")] {
+                            match TranscribeBuilder::default()
+                            .language(self.language)
+                            .audio(audio)
+                            .force_cpu(self.force_cpu)
+                            .tx(tx.clone())
+                            .model(model_files)
+                            .build() {
+                                Ok(compute) => compute.transcribe(),
+                                Err(err) => {
+                                    let _ = tx.send(Err(err.into()));
+                                }
+                            }
+                        } else if #[cfg(feature = "burn_vulkan")] {
+                            if self.force_cpu {
+                                match TranscribeBuilder::<NdArray>::default()
+                                    .language(self.language)
+                                    .audio(audio.unwrap())
+                                    .tx(tx.clone())
+                                    .try_model(model.unwrap())
+                                    .unwrap()
+                                    .build()
+                                {
                                     Ok(compute) => compute.transcribe(),
                                     Err(err) => {
                                         let _ = tx.send(Err(err.into()));
                                     }
                                 }
-                            } else if #[cfg(feature = "burn_vulkan")] {
-                                if self.force_cpu {
-                                    match TranscribeBuilder::<NdArray>::default()
-                                        .language(self.language)
-                                        .audio(audio)
-                                        .tx(tx.clone())
-                                        .try_model(model_files)
-                                        .unwrap()
-                                        .build()
-                                    {
-                                        Ok(compute) => compute.transcribe(),
-                                        Err(err) => {
-                                            let _ = tx.send(Err(err.into()));
-                                        }
-                                    }
-                                } else {
-                                    match TranscribeBuilder::<Wgpu>::default()
-                                        .language(self.language)
-                                        .audio(audio)
-                                        .tx(tx.clone())
-                                        .try_model(model_files)
-                                        .unwrap()
-                                        .build()
-                                    {
-                                        Ok(compute) => compute.transcribe(),
-                                        Err(err) => {
-                                            let _ = tx.send(Err(err.into()));
-                                        }
+                            } else {
+                                match TranscribeBuilder::<Wgpu>::default()
+                                    .language(self.language)
+                                    .audio(audio.unwrap())
+                                    .tx(tx.clone())
+                                    .try_model(model.unwrap())
+                                    .unwrap()
+                                    .build()
+                                {
+                                    Ok(compute) => compute.transcribe(),
+                                    Err(err) => {
+                                        let _ = tx.send(Err(err.into()));
                                     }
                                 }
                             }
                         }
-                    }
-                    Ok((_, Err(err))) => {
-                        let _ = tx.send(Err(err));
-                    }
-                    Err(err) => {
-                        let _ = tx.send(Err(err));
                     }
                 }
             });
@@ -237,7 +238,7 @@ impl Whisper {
         rx
     }
 
-    fn load_audio(path: PathBuf) -> Result<(Vec<f32>, Duration), Error> {
+    fn load_audio(path: PathBuf) -> Result<AudioData, Error> {
         let reader = BufReader::new(File::open(path)?);
         let decoder = Decoder::new(reader)?;
         let duration = decoder.total_duration().ok_or(Error::AudioDuration)?;
