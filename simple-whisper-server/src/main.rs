@@ -374,7 +374,7 @@ mod tests {
             .json()
             .await
             .unwrap();
-        assert!(models.len() > 0);
+        assert_eq!(33, models.len());
 
         let websocket = Client::default()
             .get("ws://127.0.0.1:4000/models/download/tiny_en?ignore_cache=false")

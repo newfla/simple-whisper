@@ -1,12 +1,11 @@
 # Simple Whisper
 
-Transcription library/cli/server base on [OpenAI Whisper](https://github.com/openai/whisper) model written using [Burn framework](https://github.com/tracel-ai/burn)🔥 or [whisper-rs](https://github.com/tazz4843/whisper-rs).
+Transcription library/cli/server based on [OpenAI Whisper](https://github.com/openai/whisper) model written using [whisper-rs](https://github.com/tazz4843/whisper-rs).
 
 ## What is included?
 
 - [Simple Whisper lib](./simple-whisper/): Implements the Whisper model via:
-  1. [Burn WGPU backend](https://github.com/tracel-ai/burn/blob/main/crates/burn-wgpu/README.md). Based over [sudomonikers/whisper-burn](https://github.com/sudomonikers/whisper-burn), provides abstraction over different models and languages. Weights are automatically downloaded from [Hugging Face repo](https://huggingface.co/newfla/simple-whisper). 
-  2. [whisper.cpp Vulkan Backend](https://github.com/tazz4843/whisper-rs). Weights are automatically downloaded from [Hugging Face repo](https://huggingface.co/ggerganov/whisper.cpp). 
+  1. [whisper.cpp Backend](https://github.com/tazz4843/whisper-rs). Weights are automatically downloaded from [Hugging Face repo](https://huggingface.co/ggerganov/whisper.cpp). 
   - Supported codec: flac, vorbis, wav, mp3
 
 - [Simple Whisper cli](./simple-whisper-cli/): CLI application useful to transcribe audio file. For more information see the [README.md](./simple-whisper-cli/README.md).
@@ -25,5 +24,4 @@ Transcription library/cli/server base on [OpenAI Whisper](https://github.com/ope
 
 ## Credits
 The project was inspired by:
-- Previous whisper Burn implementations: [sudomonikers/whisper-burn](https://github.com/sudomonikers/whisper-burn) and [Gadersd/whisper-burn](https://github.com/Gadersd/whisper-burn).
 - Candle implementation: [rwhisper](https://github.com/floneum/floneum/tree/main/models/rwhisper).
