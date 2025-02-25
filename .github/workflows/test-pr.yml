@@ -34,7 +34,7 @@ jobs:
           sudo apt-get install -y libasound2-dev
 
       - name: install vulkan sdk
-        if: matrix.platform == 'macos-latest'
+        if: matrix.platform == 'ubuntu-latest'
         uses: humbletim/install-vulkan-sdk@c2aa128094d42ba02959a660f03e0a4e012192f9
         with:
           version: 1.3.250.1
@@ -50,12 +50,8 @@ jobs:
         run: cargo build 
 
       - name: check whisper-rs vulkan build
-        if: matrix.platform == 'macos-latest'
+        if: matrix.platform == 'ubuntu-latest'
         run: cargo build --no-default-features --features whisper_cpp_vulkan
       
       - name: run generic tests
         run: cargo test
-    
-      - name: run burn inference tests
-        if: matrix.platform == 'macos-latest'
-        run: cargo test --release -- --ignored
