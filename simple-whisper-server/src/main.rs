@@ -67,8 +67,6 @@ struct ModelParameters {
 struct TranscribeParameters {
     #[serde(default)]
     ignore_cache: bool,
-    #[serde(default)]
-    force_cpu: bool,
 }
 
 #[derive(EnumIs, Debug, Deserialize, Serialize)]
@@ -293,7 +291,6 @@ async fn transcribe(
         .language(lang.unwrap())
         .model(model.unwrap())
         .force_download(parameters.0.ignore_cache)
-        .force_cpu(parameters.0.force_cpu)
         .build()
         .unwrap();
 
@@ -424,7 +421,7 @@ mod tests {
 
         let client = Client::new();
         let websocket = client
-            .get("ws://127.0.0.1:5000/transcribe/tiny/en?force_cpu=true")
+            .get("ws://127.0.0.1:5000/transcribe/tiny/en")
             .upgrade()
             .send()
             .await

@@ -43,8 +43,6 @@ pub struct Whisper {
     progress_bar: bool,
     #[builder(default = "false")]
     force_download: bool,
-    #[builder(default = "false")]
-    force_cpu: bool,
 }
 
 #[derive(Error, Debug)]
@@ -153,7 +151,6 @@ impl Whisper {
                         match TranscribeBuilder::default()
                             .language(self.language)
                             .audio(audio)
-                            .force_cpu(self.force_cpu)
                             .tx(tx.clone())
                             .model(model_files)
                             .build()
@@ -229,11 +226,10 @@ mod tests {
             .language(Language::English)
             .model(Model::Tiny)
             .progress_bar(true)
-            .force_cpu(false)
             .build()
             .unwrap()
             .transcribe(test_file!("samples_jfk.wav"));
-
+        
         while let Some(msg) = rx.recv().await {
             assert!(msg.is_ok());
             println!("{msg:?}");

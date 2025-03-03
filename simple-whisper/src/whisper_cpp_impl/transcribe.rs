@@ -17,8 +17,6 @@ use crate::{model::LocalModel, Error, Event, Language};
 )]
 pub struct Transcribe {
     language: Language,
-    #[builder(setter(name = "force_cpu"))]
-    _force_cpu: bool,
     audio: (Vec<f32>, Duration),
     tx: UnboundedSender<Result<Event, Error>>,
     #[builder(setter(name = "model"))]
@@ -33,10 +31,6 @@ impl TranscribeBuilder {
             return Err(TranscribeBuilderError::UninitializedFieldError("language"));
         }
 
-        if self._force_cpu.is_none() {
-            return Err(TranscribeBuilderError::UninitializedFieldError("force_cpu"));
-        }
-
         if self.audio.is_none() {
             return Err(TranscribeBuilderError::UninitializedFieldError("audio"));
         }
@@ -49,11 +43,10 @@ impl TranscribeBuilder {
             return Err(TranscribeBuilderError::UninitializedFieldError("model"));
         }
 
-        let state = state_builder(self._model.as_ref().unwrap(), self._force_cpu.unwrap())?;
+        let state = state_builder(self._model.as_ref().unwrap())?;
 
         Ok(Transcribe {
             language: self.language.unwrap(),
-            _force_cpu: self._force_cpu.unwrap(),
             audio: self.audio.unwrap(),
             tx: self.tx.unwrap(),
             _model: self._model.unwrap(),
@@ -70,10 +63,10 @@ pub enum TranscribeBuilderError {
     WhisperCppError(#[from] WhisperError),
 }
 
-fn state_builder(model: &LocalModel, force_cpu: bool) -> Result<WhisperState, WhisperError> {
+fn state_builder(model: &LocalModel) -> Result<WhisperState, WhisperError> {
     let mut context_param = WhisperContextParameters::default();
 
-    context_param.use_gpu(!force_cpu);
+    context_param.use_gpu(true);
 
     let ctx = WhisperContext::new_with_params(model.model.to_str().unwrap(), context_param)?;
 
