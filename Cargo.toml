@@ -20,7 +20,7 @@ anyhow = "1.0.86"
 axum = { version = "0.7.5", features = ["json", "ws"] }
 clap = { version = "4.5.7", features = ["derive"] }
 derive_builder = "0.20.0"
-hf-hub = { version = "0.3.2", features = ["tokio"] }
+hf-hub = { version = "0.4.2", features = ["tokio"] }
 indicatif = { version = "0.17.8", features = ["improved_unicode"] }
 rodio = "0.19.0"
 serde = "1.0.203"

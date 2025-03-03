@@ -74,6 +74,22 @@ pub enum Event {
     DownloadStarted { file: String },
     #[strum(to_string = "{file} has been downloaded")]
     DownloadCompleted { file: String },
+    #[strum(
+        to_string = "Downloading {file} --> {percentage} {elapsed_time:#?} | {remaining_time:#?}"
+    )]
+    DownloadProgress {
+        /// The resource to download
+        file: String,
+
+        /// The progress expressed as %
+        percentage: f32,
+
+        /// Time elapsed since the download as being started
+        elapsed_time: Duration,
+
+        /// Estimated time to complete the download
+        remaining_time: Duration,
+    },
     /// Audio chunk transcripted
     #[strum(to_string = "{transcription}")]
     Segment {
