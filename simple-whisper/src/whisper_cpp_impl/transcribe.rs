@@ -82,6 +82,7 @@ impl Transcribe {
         let lang = self.language.to_string();
 
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 0 });
+        params.set_n_threads(num_cpus::get().try_into().unwrap());
         params.set_language(Some(&lang));
         params.set_print_special(false);
         params.set_print_progress(false);
