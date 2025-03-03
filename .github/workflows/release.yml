@@ -135,7 +135,7 @@ jobs:
         if: matrix.runner == 'ubuntu-20.04'
         run: |
             sudo apt-get update
-            sudo apt-get install -y libasound2-dev ffmpeg
+            sudo apt-get install -y libasound2-dev ffmpeg clang libavcodec-dev libavformat-dev libavutil-dev pkg-config
       #- name: install vulkan sdk
       #  uses: humbletim/install-vulkan-sdk@c2aa128094d42ba02959a660f03e0a4e012192f9
       #  with:
