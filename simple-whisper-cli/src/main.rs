@@ -42,6 +42,10 @@ enum Commands {
         #[arg(long, required = false)]
         ignore_cache: bool,
 
+        /// Force single segment output. This may be useful for streaming.
+        #[arg(long, required = false)]
+        single_segment: bool,
+
         /// Verbose STDOUT
         #[arg(long, required = false, short = 'v')]
         verbose: bool,
@@ -96,6 +100,7 @@ async fn main() {
             model,
             language,
             ignore_cache,
+            single_segment,
             verbose,
         } => {
             match WhisperBuilder::default()
@@ -103,6 +108,7 @@ async fn main() {
                 .model(model)
                 .progress_bar(true)
                 .force_download(ignore_cache)
+                .force_single_segment(single_segment)
                 .build()
             {
                 Ok(model) => {
