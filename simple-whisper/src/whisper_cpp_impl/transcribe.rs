@@ -23,6 +23,7 @@ pub struct Transcribe {
     _model: LocalModel,
     #[builder(setter(skip))]
     state: WhisperState,
+    single_segment: bool,
 }
 
 impl TranscribeBuilder {
@@ -51,6 +52,7 @@ impl TranscribeBuilder {
             tx: self.tx.unwrap(),
             _model: self._model.unwrap(),
             state,
+            single_segment: self.single_segment.unwrap_or(false),
         })
     }
 }
@@ -82,6 +84,7 @@ impl Transcribe {
         let lang = self.language.to_string();
 
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 0 });
+        params.set_single_segment(self.single_segment);
         params.set_n_threads(num_cpus::get().try_into().unwrap());
         params.set_language(Some(&lang));
         params.set_print_special(false);

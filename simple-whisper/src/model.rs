@@ -33,28 +33,36 @@ impl Model {
 
     pub async fn download_model_listener(
         &self,
-        progress: bool,
+        progress_bar: bool,
         force_download: bool,
         tx: UnboundedSender<Event>,
     ) -> Result<LocalModel, Error> {
         let coordinates = self.hf_coordinates();
         let repo = hf_hub::api::tokio::ApiBuilder::default()
-            .with_progress(progress)
+            .with_progress(progress_bar)
             .build()
             .map(|api| api.repo(coordinates.repo.clone()))
             .map_err(Into::<Error>::into)?;
         let cache = Cache::from_env().repo(coordinates.repo);
         let tokenizer = if let Some(val) = coordinates.tokenizer {
-            Some(download_file(&val, force_download, &tx, &repo, &cache).await?)
+            Some(download_file(&val, progress_bar, force_download, &tx, &repo, &cache).await?)
         } else {
             None
         };
         let config = if let Some(val) = coordinates.config {
-            Some(download_file(&val, force_download, &tx, &repo, &cache).await?)
+            Some(download_file(&val, progress_bar, force_download, &tx, &repo, &cache).await?)
         } else {
             None
         };
-        let model = download_file(&coordinates.model, force_download, &tx, &repo, &cache).await?;
+        let model = download_file(
+            &coordinates.model,
+            progress_bar,
+            force_download,
+            &tx,
+            &repo,
+            &cache,
+        )
+        .await?;
         Ok(LocalModel {
             config,
             model,
@@ -65,17 +73,18 @@ impl Model {
 
     pub async fn download_model(
         &self,
-        progress: bool,
+        progress_bar: bool,
         force_download: bool,
     ) -> Result<LocalModel, Error> {
         let (tx, _rx) = unbounded_channel();
-        self.download_model_listener(progress, force_download, tx)
+        self.download_model_listener(progress_bar, force_download, tx)
             .await
     }
 }
 
 async fn download_file(
     file: &str,
+    progress_bar: bool,
     force_download: bool,
     tx: &UnboundedSender<Event>,
     repo: &ApiRepo,
@@ -92,9 +101,11 @@ async fn download_file(
             download_state: Default::default(),
             tx: tx.clone(),
         };
-        repo.download_with_progress(file, progress)
-            .await
-            .map_err(Into::into)
+        match progress_bar {
+            true => repo.download(file).await,
+            false => repo.download_with_progress(file, progress).await,
+        }
+        .map_err(Into::into)
     }
 }
 

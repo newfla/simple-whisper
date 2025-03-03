@@ -43,6 +43,8 @@ pub struct Whisper {
     progress_bar: bool,
     #[builder(default = "false")]
     force_download: bool,
+    #[builder(default = "false")]
+    force_single_segment: bool,
 }
 
 #[derive(Error, Debug)]
@@ -151,6 +153,7 @@ impl Whisper {
                         match TranscribeBuilder::default()
                             .language(self.language)
                             .audio(audio)
+                            .single_segment(self.force_single_segment)
                             .tx(tx.clone())
                             .model(model_files)
                             .build()
