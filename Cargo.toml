@@ -22,7 +22,6 @@ clap = { version = "4.5.7", features = ["derive"] }
 derive_builder = "0.20.0"
 hf-hub = { version = "0.4.2", features = ["tokio"] }
 indicatif = { version = "0.17.8", features = ["improved_unicode"] }
-metadata = "0.1.10"
 num_cpus = "1.16.0"
 rodio = { version = "0.20.1"}
 serde = "1.0.203"

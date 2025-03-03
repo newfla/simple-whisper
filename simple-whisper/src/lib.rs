@@ -12,7 +12,6 @@ mod model;
 
 pub use language::Language;
 
-use metadata::MediaFileMetadata;
 use rodio::{source::UniformSourceIterator, Decoder, Source};
 use strum::{Display, EnumIs};
 use thiserror::Error;
@@ -178,7 +177,6 @@ impl Whisper {
     fn load_audio(path: PathBuf) -> Result<(Vec<f32>, Duration), Error> {
         let reader = BufReader::new(File::open(&path)?);
         let decoder = Decoder::new(reader)?;
-        let duration = Self::get_audio_duration(&path)?;
         let resample: UniformSourceIterator<Decoder<BufReader<File>>, f32> =
             UniformSourceIterator::new(decoder, 1, SAMPLE_RATE);
         let samples = resample
@@ -187,15 +185,14 @@ impl Whisper {
             .convert_samples()
             .collect::<Vec<f32>>();
 
+        let duration = Self::get_audio_duration(samples.len());
+
         Ok((samples, duration))
     }
 
-    fn get_audio_duration(path: &Path) -> Result<Duration, Error> {
-        let secs = MediaFileMetadata::new(&path)
-            .map_err(|_| Error::AudioDuration)?
-            ._duration
-            .ok_or(Error::AudioDuration)?;
-        Ok(Duration::from_secs_f64(secs))
+    fn get_audio_duration(samples: usize) -> Duration {
+        let secs = samples as f64 / SAMPLE_RATE as f64;
+        Duration::from_secs_f64(secs)
     }
 }
 
