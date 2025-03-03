@@ -3,8 +3,8 @@ use std::time::Duration;
 use derive_builder::Builder;
 use tokio::sync::mpsc::UnboundedSender;
 use whisper_rs::{
-    DtwMode::ModelPreset, DtwModelPreset, FullParams, SamplingStrategy, SegmentCallbackData,
-    WhisperContext, WhisperContextParameters, WhisperError, WhisperState,
+    FullParams, SamplingStrategy, SegmentCallbackData, WhisperContext, WhisperContextParameters,
+    WhisperError, WhisperState,
 };
 
 use crate::{model::LocalModel, Error, Event, Language};
@@ -72,43 +72,6 @@ pub enum TranscribeBuilderError {
 
 fn state_builder(model: &LocalModel, force_cpu: bool) -> Result<WhisperState, WhisperError> {
     let mut context_param = WhisperContextParameters::default();
-    context_param.dtw_parameters.mode = ModelPreset {
-        model_preset: match model.model_type {
-            crate::Model::Tiny => DtwModelPreset::Tiny,
-            crate::Model::TinyEn => DtwModelPreset::TinyEn,
-            crate::Model::Base => DtwModelPreset::Base,
-            crate::Model::BaseEn => DtwModelPreset::BaseEn,
-            crate::Model::Small => DtwModelPreset::Small,
-            crate::Model::SmallEn => DtwModelPreset::SmallEn,
-            crate::Model::Medium => DtwModelPreset::Medium,
-            crate::Model::MediumEn => DtwModelPreset::MediumEn,
-            crate::Model::Large => DtwModelPreset::LargeV1,
-            crate::Model::LargeV2 => DtwModelPreset::LargeV2,
-            crate::Model::LargeV3 => DtwModelPreset::LargeV3,
-            crate::Model::TinyQ5_1 => DtwModelPreset::Tiny,
-            crate::Model::TinyQ8_0 => DtwModelPreset::Tiny,
-            crate::Model::TinyEnQ5_1 => DtwModelPreset::TinyEn,
-            crate::Model::TinyEnQ8_0 => DtwModelPreset::TinyEn,
-            crate::Model::BaseQ5_1 => DtwModelPreset::Base,
-            crate::Model::BaseQ8_0 => DtwModelPreset::Base,
-            crate::Model::BaseEnQ5_1 => DtwModelPreset::BaseEn,
-            crate::Model::BaseEnQ8_0 => DtwModelPreset::BaseEn,
-            crate::Model::SmallQ5_1 => DtwModelPreset::Small,
-            crate::Model::SmallQ8_0 => DtwModelPreset::Small,
-            crate::Model::SmallEnQ5_1 => DtwModelPreset::SmallEn,
-            crate::Model::SmallEnQ8_0 => DtwModelPreset::SmallEn,
-            crate::Model::MediumQ5_0 => DtwModelPreset::Medium,
-            crate::Model::MediumQ8_0 => DtwModelPreset::Medium,
-            crate::Model::MediumEnQ5_0 => DtwModelPreset::MediumEn,
-            crate::Model::MediumEnQ8_0 => DtwModelPreset::MediumEn,
-            crate::Model::LargeV2Q5_0 => DtwModelPreset::LargeV2,
-            crate::Model::LargeV2Q8_0 => DtwModelPreset::LargeV2,
-            crate::Model::LargeV3Q5_0 => DtwModelPreset::LargeV3,
-            crate::Model::LargeV3Turbo => DtwModelPreset::LargeV3Turbo,
-            crate::Model::LargeV3TurboQ5_0 => DtwModelPreset::LargeV3Turbo,
-            crate::Model::LargeV3TurboQ8_0 => DtwModelPreset::LargeV3Turbo,
-        },
-    };
 
     context_param.use_gpu(!force_cpu);
 
