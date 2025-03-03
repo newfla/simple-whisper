@@ -67,8 +67,6 @@ struct ModelParameters {
 struct TranscribeParameters {
     #[serde(default)]
     ignore_cache: bool,
-    #[serde(default)]
-    force_cpu: bool,
 }
 
 #[derive(EnumIs, Debug, Deserialize, Serialize)]
@@ -78,6 +76,12 @@ enum ServerResponse {
     },
     FileCompleted {
         file: String,
+    },
+    FileProgress {
+        file: String,
+        percentage: f32,
+        elapsed_time: Duration,
+        remaining_time: Duration,
     },
     Failed,
     DownloadModelCompleted,
@@ -104,6 +108,17 @@ impl From<Event> for ServerResponse {
                 end_offset,
                 percentage,
                 transcription,
+            },
+            Event::DownloadProgress {
+                file,
+                percentage,
+                elapsed_time,
+                remaining_time,
+            } => Self::FileProgress {
+                file,
+                percentage,
+                elapsed_time,
+                remaining_time,
             },
         }
     }
@@ -276,7 +291,6 @@ async fn transcribe(
         .language(lang.unwrap())
         .model(model.unwrap())
         .force_download(parameters.0.ignore_cache)
-        .force_cpu(parameters.0.force_cpu)
         .build()
         .unwrap();
 
@@ -377,7 +391,7 @@ mod tests {
         assert_eq!(33, models.len());
 
         let websocket = Client::default()
-            .get("ws://127.0.0.1:4000/models/download/tiny_en?ignore_cache=false")
+            .get("ws://127.0.0.1:4000/models/download/tiny_en?ignore_cache=true")
             .upgrade()
             .send()
             .await
@@ -393,6 +407,7 @@ mod tests {
             assert!(
                 msg.is_file_started()
                     || msg.is_file_completed()
+                    || msg.is_file_progress()
                     || msg.is_download_model_completed()
             )
         }
@@ -406,7 +421,7 @@ mod tests {
 
         let client = Client::new();
         let websocket = client
-            .get("ws://127.0.0.1:5000/transcribe/tiny/en?force_cpu=true")
+            .get("ws://127.0.0.1:5000/transcribe/tiny/en")
             .upgrade()
             .send()
             .await

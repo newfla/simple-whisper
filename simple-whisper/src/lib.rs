@@ -43,8 +43,6 @@ pub struct Whisper {
     progress_bar: bool,
     #[builder(default = "false")]
     force_download: bool,
-    #[builder(default = "false")]
-    force_cpu: bool,
 }
 
 #[derive(Error, Debug)]
@@ -74,6 +72,22 @@ pub enum Event {
     DownloadStarted { file: String },
     #[strum(to_string = "{file} has been downloaded")]
     DownloadCompleted { file: String },
+    #[strum(
+        to_string = "Downloading {file} --> {percentage} {elapsed_time:#?} | {remaining_time:#?}"
+    )]
+    DownloadProgress {
+        /// The resource to download
+        file: String,
+
+        /// The progress expressed as %
+        percentage: f32,
+
+        /// Time elapsed since the download as being started
+        elapsed_time: Duration,
+
+        /// Estimated time to complete the download
+        remaining_time: Duration,
+    },
     /// Audio chunk transcripted
     #[strum(to_string = "{transcription}")]
     Segment {
@@ -137,7 +151,6 @@ impl Whisper {
                         match TranscribeBuilder::default()
                             .language(self.language)
                             .audio(audio)
-                            .force_cpu(self.force_cpu)
                             .tx(tx.clone())
                             .model(model_files)
                             .build()
@@ -162,9 +175,8 @@ impl Whisper {
     }
 
     fn load_audio(path: PathBuf) -> Result<(Vec<f32>, Duration), Error> {
-        let reader = BufReader::new(File::open(path)?);
+        let reader = BufReader::new(File::open(&path)?);
         let decoder = Decoder::new(reader)?;
-        let duration = decoder.total_duration().ok_or(Error::AudioDuration)?;
         let resample: UniformSourceIterator<Decoder<BufReader<File>>, f32> =
             UniformSourceIterator::new(decoder, 1, SAMPLE_RATE);
         let samples = resample
@@ -173,7 +185,14 @@ impl Whisper {
             .convert_samples()
             .collect::<Vec<f32>>();
 
+        let duration = Self::get_audio_duration(samples.len());
+
         Ok((samples, duration))
+    }
+
+    fn get_audio_duration(samples: usize) -> Duration {
+        let secs = samples as f64 / SAMPLE_RATE as f64;
+        Duration::from_secs_f64(secs)
     }
 }
 
@@ -213,7 +232,6 @@ mod tests {
             .language(Language::English)
             .model(Model::Tiny)
             .progress_bar(true)
-            .force_cpu(false)
             .build()
             .unwrap()
             .transcribe(test_file!("samples_jfk.wav"));
