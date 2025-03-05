@@ -19,6 +19,7 @@ indicatif.workspace = true
 simple-whisper = { path = "../simple-whisper"}
 strum.workspace = true
 tokio.workspace = true
+tokio-stream.workspace = true
 
 [features]
 vulkan = ["simple-whisper/vulkan"]

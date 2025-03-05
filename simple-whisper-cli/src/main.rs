@@ -5,6 +5,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use simple_whisper::{Event, Language, Model, WhisperBuilder};
 use strum::{EnumMessage, IntoEnumIterator};
 use tokio::fs::write;
+use tokio_stream::StreamExt;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -113,7 +114,7 @@ async fn main() {
             {
                 Ok(model) => {
                     let mut segments: Vec<String> = Vec::new();
-                    let mut rx = model.transcribe(input_file);
+                    let mut stream = model.transcribe(input_file);
                     let pb = if verbose {
                         None
                     } else {
@@ -126,7 +127,7 @@ async fn main() {
                         );
                         Some(pb)
                     };
-                    while let Some(msg) = rx.recv().await {
+                    while let Some(msg) = stream.next().await {
                         match msg {
                             Ok(msg) => {
                                 if msg.is_segment() {

@@ -17,6 +17,7 @@ use strum::{EnumIs, EnumMessage, IntoEnumIterator};
 use tempfile::NamedTempFile;
 use thiserror::Error;
 use tokio::{fs::write, net::TcpListener, spawn, sync::mpsc::unbounded_channel};
+use tokio_stream::StreamExt;
 use tower_http::trace::TraceLayer;
 use tracing::info_span;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -311,8 +312,8 @@ async fn internal_handle_transcription_model(
     if let Some(Ok(Message::Binary(data))) = socket.recv().await {
         let file = NamedTempFile::new()?;
         write(file.path(), data).await?;
-        let mut rx = model.transcribe(file.path());
-        while let Some(msg) = rx.recv().await {
+        let mut stream = model.transcribe(file.path());
+        while let Some(msg) = stream.next().await {
             match msg {
                 Ok(msg) => {
                     if msg.is_segment() {
