@@ -17,14 +17,12 @@ use strum::{Display, EnumIs};
 use thiserror::Error;
 use tokio::{
     spawn,
-    sync::{
-        mpsc::{unbounded_channel, UnboundedReceiver},
-        Notify,
-    },
+    sync::{mpsc::unbounded_channel, Notify},
     task::spawn_blocking,
 };
 
 mod whisper_cpp_impl;
+use tokio_stream::{wrappers::UnboundedReceiverStream, Stream};
 pub use whisper_cpp_impl::model::Model;
 use whisper_cpp_impl::transcribe::{TranscribeBuilder, TranscribeBuilderError};
 use whisper_rs::WhisperError;
@@ -118,7 +116,7 @@ impl WhisperBuilder {
 
 impl Whisper {
     /// Transcribe an audio file into text.
-    pub fn transcribe(self, path: impl AsRef<Path>) -> UnboundedReceiver<Result<Event, Error>> {
+    pub fn transcribe(self, path: impl AsRef<Path>) -> impl Stream<Item = Result<Event, Error>> {
         let (tx, rx) = unbounded_channel();
         let (tx_event, mut rx_event) = unbounded_channel();
 
@@ -174,7 +172,7 @@ impl Whisper {
             });
         });
 
-        rx
+        UnboundedReceiverStream::new(rx)
     }
 
     fn load_audio(path: PathBuf) -> Result<(Vec<f32>, Duration), Error> {
@@ -201,6 +199,8 @@ impl Whisper {
 
 #[cfg(test)]
 mod tests {
+    use tokio_stream::StreamExt;
+
     use super::*;
 
     macro_rules! test_file {
@@ -239,7 +239,7 @@ mod tests {
             .unwrap()
             .transcribe(test_file!("samples_jfk.wav"));
 
-        while let Some(msg) = rx.recv().await {
+        while let Some(msg) = rx.next().await {
             assert!(msg.is_ok());
             println!("{msg:?}");
         }
