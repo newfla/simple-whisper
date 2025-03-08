@@ -47,7 +47,7 @@ pub struct Whisper {
 
 #[derive(Error, Debug)]
 pub enum Error {
-    /// Error that can occur during model files downlaod from huggingface
+    /// Error that can occur during model files download from huggingface
     #[error(transparent)]
     Download(#[from] hf_hub::api::tokio::ApiError),
     #[error(transparent)]
@@ -55,11 +55,11 @@ pub enum Error {
     /// Error that can occur during audio file decoding phase
     #[error(transparent)]
     AudioDecoder(#[from] rodio::decoder::DecoderError),
-    /// The library was unablle to determine the audio file duration
+    /// The library was unable to determine the audio file duration
     #[error("Unable to find duration")]
     AudioDuration,
     #[error(transparent)]
-    /// Missing paramters to instantiate the whisper cpp backend
+    /// Missing parameters to instantiate the whisper cpp backend
     ComputeBuilder(#[from] TranscribeBuilderError),
     #[error(transparent)]
     Whisper(#[from] WhisperError),
@@ -88,7 +88,7 @@ pub enum Event {
         /// Estimated time to complete the download
         remaining_time: Duration,
     },
-    /// Audio chunk transcripted
+    /// Audio chunk transcript
     #[strum(to_string = "{transcription}")]
     Segment {
         start_offset: Duration,
