@@ -7,11 +7,15 @@ use std::{
 };
 
 use derive_builder::Builder;
+
+mod download;
 mod language;
 mod model;
+mod transcribe;
 
+use download::ProgressType;
 pub use language::Language;
-
+pub use model::Model;
 use rodio::{source::UniformSourceIterator, Decoder, Source};
 use strum::{Display, EnumIs};
 use thiserror::Error;
@@ -20,16 +24,15 @@ use tokio::{
     sync::{mpsc::unbounded_channel, Notify},
     task::spawn_blocking,
 };
+pub use transcribe::TranscribeBuilderError;
 
-mod whisper_cpp_impl;
 use tokio_stream::{wrappers::UnboundedReceiverStream, Stream};
-pub use whisper_cpp_impl::model::Model;
-use whisper_cpp_impl::transcribe::{TranscribeBuilder, TranscribeBuilderError};
+use transcribe::TranscribeBuilder;
 use whisper_rs::WhisperError;
 
 type Barrier = Arc<Notify>;
 
-pub(crate) const SAMPLE_RATE: u32 = 16000;
+pub const SAMPLE_RATE: u32 = 16000;
 
 /// The Whisper audio transcription model.
 #[derive(Default, Builder, Debug)]
@@ -45,6 +48,7 @@ pub struct Whisper {
     force_single_segment: bool,
 }
 
+/// Error conditions
 #[derive(Error, Debug)]
 pub enum Error {
     /// Error that can occur during model files download from huggingface
@@ -136,9 +140,14 @@ impl Whisper {
 
         spawn(async move {
             // Download model data from Hugging Face
+            let progress = if self.progress_bar {
+                ProgressType::ProgressBar
+            } else {
+                ProgressType::Callback(tx_event)
+            };
             let model = self
                 .model
-                .download_model_listener(self.progress_bar, self.force_download, tx_event)
+                .internal_download_model(self.force_download, progress)
                 .await;
             download_completed.notified().await;
 

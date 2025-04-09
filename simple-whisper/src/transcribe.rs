@@ -1,4 +1,7 @@
-use std::time::Duration;
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use derive_builder::Builder;
 use tokio::sync::mpsc::UnboundedSender;
@@ -7,7 +10,7 @@ use whisper_rs::{
     WhisperError, WhisperState,
 };
 
-use crate::{model::LocalModel, Error, Event, Language};
+use crate::{Error, Event, Language};
 
 #[derive(Builder)]
 #[builder(
@@ -20,7 +23,7 @@ pub struct Transcribe {
     audio: (Vec<f32>, Duration),
     tx: UnboundedSender<Result<Event, Error>>,
     #[builder(setter(name = "model"))]
-    _model: LocalModel,
+    _model: PathBuf,
     #[builder(setter(skip))]
     state: WhisperState,
     single_segment: bool,
@@ -57,6 +60,7 @@ impl TranscribeBuilder {
     }
 }
 
+/// Error type for TrascriveBuilder
 #[derive(Error, Debug)]
 pub enum TranscribeBuilderError {
     #[error("Field not initialized: {0}")]
@@ -65,12 +69,12 @@ pub enum TranscribeBuilderError {
     WhisperCppError(#[from] WhisperError),
 }
 
-fn state_builder(model: &LocalModel) -> Result<WhisperState, WhisperError> {
+fn state_builder(model: &Path) -> Result<WhisperState, WhisperError> {
     let mut context_param = WhisperContextParameters::default();
 
     context_param.use_gpu(true);
 
-    let ctx = WhisperContext::new_with_params(model.model.to_str().unwrap(), context_param)?;
+    let ctx = WhisperContext::new_with_params(model.to_str().unwrap(), context_param)?;
 
     ctx.create_state()
 }

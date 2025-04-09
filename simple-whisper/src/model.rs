@@ -1,201 +1,314 @@
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    time::Instant,
+use std::path::PathBuf;
+
+use hf_hub::{Cache, Repo};
+use strum::{Display, EnumIter, EnumString};
+use tokio::sync::mpsc::UnboundedSender;
+
+use crate::{
+    download::{download_file, ProgressType},
+    Error, Event,
 };
 
-use hf_hub::{
-    api::tokio::{ApiRepo, Progress},
-    Cache, CacheRepo, Repo,
-};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
-
-use crate::{Error, Event, Model};
-
-pub(crate) struct HFCoordinates {
-    pub(crate) repo: Repo,
-    pub(crate) config: Option<String>,
-    pub(crate) model: String,
-    pub(crate) tokenizer: Option<String>,
+struct HFCoordinates {
+    repo: Repo,
+    model: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct LocalModel {
-    pub config: Option<PathBuf>,
-    pub model: PathBuf,
-    pub tokenizer: Option<PathBuf>,
-    pub model_type: Model,
+/// OpenAI supported models
+#[derive(Default, Clone, Debug, EnumIter, EnumString, Display)]
+#[strum(serialize_all = "snake_case")]
+pub enum Model {
+    /// The tiny model.
+    #[strum(serialize = "tiny", to_string = "Tiny - tiny")]
+    Tiny,
+    /// The tiny-q5_1 model.
+    #[strum(serialize = "tiny-q5_1", to_string = "Tiny - tiny-q5_1")]
+    TinyQ5_1,
+    /// The tiny-q8_0 model.
+    #[strum(serialize = "tiny-q8_0", to_string = "Tiny - tiny-q8_0")]
+    TinyQ8_0,
+    /// The tiny model with only English support.
+    #[strum(serialize = "tiny_en", to_string = "TinyEn - tiny_en")]
+    TinyEn,
+    /// The tiny-q5_1 model with only English support.
+    #[strum(serialize = "tiny_en-q5_1", to_string = "TinyEn - tiny_en-q5_1")]
+    TinyEnQ5_1,
+    /// The tiny-q8_0 model with only English support.
+    #[strum(serialize = "tiny_en-q8_0", to_string = "Tiny - tiny_en-q8_0")]
+    TinyEnQ8_0,
+    /// The base model.
+    #[default]
+    #[strum(serialize = "base", to_string = "Base - base")]
+    Base,
+    /// The base-q5_1 model.
+    #[strum(serialize = "base-q5_1", to_string = "Base - base-q5_1")]
+    BaseQ5_1,
+    /// The base-q8_0 model.
+    #[strum(serialize = "base-q8_0", to_string = "Base - base-q8_0")]
+    BaseQ8_0,
+    /// The base model with only English support.
+    #[strum(serialize = "base_en", to_string = "BaseEn - base_en")]
+    BaseEn,
+    /// The base-q5_1 model with only English support.
+    #[strum(serialize = "base_en-q5_1", to_string = "BaseEn -base_en-q5_1")]
+    BaseEnQ5_1,
+    /// The base-q8_0 model with only English support.
+    #[strum(serialize = "base_en-q8_0", to_string = "BaseEn - base_en-q8_0")]
+    BaseEnQ8_0,
+    /// The small model.
+    #[strum(serialize = "small", to_string = "Small - small")]
+    Small,
+    /// The small-q5_1 model.
+    #[strum(serialize = "small-q5_1", to_string = "Small - small-q5_1")]
+    SmallQ5_1,
+    /// The small-q8_0 model.
+    #[strum(serialize = "small-q8_0", to_string = "Small - small-q8_0")]
+    SmallQ8_0,
+    /// The small model with only English support.
+    #[strum(serialize = "small_en", to_string = "SmallEn - small_en")]
+    SmallEn,
+    /// The small-q5_1 model with only English support.
+    #[strum(serialize = "small_en-q5_1", to_string = "SmallEn - small_en-q5_1")]
+    SmallEnQ5_1,
+    /// The small-q8_0 model with only English support.
+    #[strum(serialize = "small_en-q8_0", to_string = "SmallEn - small_en-q8_0")]
+    SmallEnQ8_0,
+    /// The medium model.
+    #[strum(serialize = "medium", to_string = "Medium - medium")]
+    Medium,
+    /// The medium-q5_0 model.
+    #[strum(serialize = "medium-q5_0", to_string = "Medium - medium-q5_0")]
+    MediumQ5_0,
+    /// The medium-q8_0 model.
+    #[strum(serialize = "medium-q8_0", to_string = "Medium - medium-q8_0")]
+    MediumQ8_0,
+    /// The medium model with only English support.
+    #[strum(serialize = "medium_en", to_string = "MediumEn - medium_en")]
+    MediumEn,
+    /// The medium-q5_0 model with only English support.
+    #[strum(serialize = "medium_en-q5_0	", to_string = "MediumEn - medium_en-q5_0")]
+    MediumEnQ5_0,
+    /// The medium-q8_0 model with only English support.
+    #[strum(serialize = "medium_en-q8_0", to_string = "MediumEn - medium_en-q8_0")]
+    MediumEnQ8_0,
+    /// The large model.
+    #[strum(serialize = "large", to_string = "Large V1 - large")]
+    Large,
+    /// The large model v2.
+    #[strum(serialize = "large_v2", to_string = "Large V2 - large_v2")]
+    LargeV2,
+    #[strum(serialize = "large_v2-q5_0", to_string = "Large V2 - large_v2-q5_0")]
+    LargeV2Q5_0,
+    #[strum(serialize = "large_v2-q8_0", to_string = "Large V2 - large_v2-q8_0")]
+    LargeV2Q8_0,
+    /// The large model v3.
+    #[strum(serialize = "large_v3", to_string = "Large V3 - large_v3")]
+    LargeV3,
+    /// The large_v3-q5_0 model v3.
+    #[strum(serialize = "large_v3-q5_0", to_string = "Large V3 - large_v3-q5_0")]
+    LargeV3Q5_0,
+    /// The large model v3 turbo.
+    #[strum(
+        serialize = "large_v3_turbo",
+        to_string = "Large V3 Turbo - large_v3_turbo"
+    )]
+    LargeV3Turbo,
+    /// The large_v3_turbo-q5_0 model v3 turbo.
+    #[strum(
+        serialize = "large_v3_turbo-q5_0",
+        to_string = "Large V3 Turbo - large_v3_turbo-q5_0"
+    )]
+    LargeV3TurboQ5_0,
+    /// The large_v3_turbo-q8_0 model v3 turbo.
+    #[strum(
+        serialize = "large_v3_turbo-q8_0",
+        to_string = "Large V3 Turbo - large_v3_turbo-q8_0"
+    )]
+    LargeV3TurboQ8_0,
 }
+
 impl Model {
+    fn hf_coordinates(&self) -> HFCoordinates {
+        let repo = Repo::with_revision(
+            "ggerganov/whisper.cpp".to_owned(),
+            hf_hub::RepoType::Model,
+            "main".to_owned(),
+        );
+        match self {
+            Model::Tiny => HFCoordinates {
+                repo,
+                model: "ggml-tiny.bin".to_owned(),
+            },
+            Model::TinyEn => HFCoordinates {
+                repo,
+                model: "ggml-tiny.en.bin".to_owned(),
+            },
+            Model::Base => HFCoordinates {
+                repo,
+                model: "ggml-base.bin".to_owned(),
+            },
+            Model::BaseEn => HFCoordinates {
+                repo,
+                model: "ggml-base.en.bin".to_owned(),
+            },
+            Model::Small => HFCoordinates {
+                repo,
+                model: "ggml-small.bin".to_owned(),
+            },
+            Model::SmallEn => HFCoordinates {
+                repo,
+                model: "ggml-small.en.bin".to_owned(),
+            },
+            Model::Medium => HFCoordinates {
+                repo,
+                model: "ggml-medium.bin".to_owned(),
+            },
+            Model::MediumEn => HFCoordinates {
+                repo,
+                model: "ggml-medium.en.bin".to_owned(),
+            },
+            Model::Large => HFCoordinates {
+                repo,
+                model: "ggml-large-v1.bin".to_owned(),
+            },
+            Model::LargeV2 => HFCoordinates {
+                repo,
+                model: "ggml-large-v2.bin".to_owned(),
+            },
+            Model::LargeV3 => HFCoordinates {
+                repo,
+                model: "ggml-large-v3.bin".to_owned(),
+            },
+            Model::TinyQ5_1 => HFCoordinates {
+                repo,
+                model: "ggml-tiny-q5_1.bin".to_owned(),
+            },
+            Model::TinyQ8_0 => HFCoordinates {
+                repo,
+                model: "ggml-tiny-q8_0.bin".to_owned(),
+            },
+            Model::TinyEnQ5_1 => HFCoordinates {
+                repo,
+                model: "ggml-tiny.en-q5_1.bin".to_owned(),
+            },
+            Model::TinyEnQ8_0 => HFCoordinates {
+                repo,
+                model: "ggml-tiny.en-q8_0.bin".to_owned(),
+            },
+            Model::BaseQ5_1 => HFCoordinates {
+                repo,
+                model: "ggml-base-q5_1.bin".to_owned(),
+            },
+            Model::BaseQ8_0 => HFCoordinates {
+                repo,
+                model: "ggml-base-q8_0.bin".to_owned(),
+            },
+            Model::BaseEnQ5_1 => HFCoordinates {
+                repo,
+                model: "ggml-base.en-q5_1.bin".to_owned(),
+            },
+            Model::BaseEnQ8_0 => HFCoordinates {
+                repo,
+                model: "ggml-base.en-q8_0.bin".to_owned(),
+            },
+            Model::SmallQ5_1 => HFCoordinates {
+                repo,
+                model: "ggml-small-q5_1.bin".to_owned(),
+            },
+            Model::SmallQ8_0 => HFCoordinates {
+                repo,
+                model: "ggml-small-q8_0.bin".to_owned(),
+            },
+            Model::SmallEnQ5_1 => HFCoordinates {
+                repo,
+                model: "ggml-small.en-q5_1.bin".to_owned(),
+            },
+            Model::SmallEnQ8_0 => HFCoordinates {
+                repo,
+                model: "ggml-small.en-q8_0.bin".to_owned(),
+            },
+            Model::MediumQ5_0 => HFCoordinates {
+                repo,
+                model: "ggml-medium-q5_0.bin".to_owned(),
+            },
+            Model::MediumQ8_0 => HFCoordinates {
+                repo,
+                model: "ggml-medium-q8_0.bin".to_owned(),
+            },
+            Model::MediumEnQ5_0 => HFCoordinates {
+                repo,
+                model: "ggml-medium.en-q5_0.bin".to_owned(),
+            },
+            Model::MediumEnQ8_0 => HFCoordinates {
+                repo,
+                model: "ggml-medium.en-q8_0.bin".to_owned(),
+            },
+            Model::LargeV2Q5_0 => HFCoordinates {
+                repo,
+                model: "ggml-large-v2-q5_0.bin".to_owned(),
+            },
+            Model::LargeV2Q8_0 => HFCoordinates {
+                repo,
+                model: "ggml-large-v2-q8_0.bin".to_owned(),
+            },
+            Model::LargeV3Q5_0 => HFCoordinates {
+                repo,
+                model: "ggml-large-v3-q5_0.bin".to_owned(),
+            },
+            Model::LargeV3Turbo => HFCoordinates {
+                repo,
+                model: "ggml-large-v3-turbo.bin".to_owned(),
+            },
+            Model::LargeV3TurboQ5_0 => HFCoordinates {
+                repo,
+                model: "ggml-large-v3-turbo-q5_0.bin".to_owned(),
+            },
+            Model::LargeV3TurboQ8_0 => HFCoordinates {
+                repo,
+                model: "ggml-large-v3-turbo-q8_0.bin".to_owned(),
+            },
+        }
+    }
+
+    /// True if the model supports multiple languages, false otherwise.
     pub fn is_multilingual(&self) -> bool {
         !self.to_string().contains("en")
     }
 
-    pub async fn download_model_listener(
-        &self,
-        progress_bar: bool,
-        force_download: bool,
-        tx: UnboundedSender<Event>,
-    ) -> Result<LocalModel, Error> {
+    /// Check if the file model has been cached before
+    pub fn cached(&self) -> bool {
         let coordinates = self.hf_coordinates();
-        let repo = hf_hub::api::tokio::ApiBuilder::default()
-            .with_progress(progress_bar)
-            .build()
-            .map(|api| api.repo(coordinates.repo.clone()))
-            .map_err(Into::<Error>::into)?;
         let cache = Cache::from_env().repo(coordinates.repo);
-        let tokenizer = if let Some(val) = coordinates.tokenizer {
-            Some(download_file(&val, progress_bar, force_download, &tx, &repo, &cache).await?)
-        } else {
-            None
-        };
-        let config = if let Some(val) = coordinates.config {
-            Some(download_file(&val, progress_bar, force_download, &tx, &repo, &cache).await?)
-        } else {
-            None
-        };
-        let model = download_file(
-            &coordinates.model,
-            progress_bar,
-            force_download,
-            &tx,
-            &repo,
-            &cache,
-        )
-        .await?;
-        Ok(LocalModel {
-            config,
-            model,
-            tokenizer,
-            model_type: self.clone(),
-        })
+        cache.get(&coordinates.model).is_some()
     }
 
-    pub async fn download_model(
+    pub(crate) async fn internal_download_model(
         &self,
-        progress_bar: bool,
         force_download: bool,
-    ) -> Result<LocalModel, Error> {
-        let (tx, _rx) = unbounded_channel();
-        self.download_model_listener(progress_bar, force_download, tx)
+        progress: ProgressType,
+    ) -> Result<PathBuf, Error> {
+        let coordinates = self.hf_coordinates();
+
+        download_file(
+            &coordinates.model,
+            force_download,
+            progress,
+            coordinates.repo,
+        )
+        .await
+    }
+
+    pub async fn download_model(&self, force_download: bool) -> Result<PathBuf, Error> {
+        self.internal_download_model(force_download, ProgressType::ProgressBar)
             .await
     }
-}
 
-async fn download_file(
-    file: &str,
-    progress_bar: bool,
-    force_download: bool,
-    tx: &UnboundedSender<Event>,
-    repo: &ApiRepo,
-    cache: &CacheRepo,
-) -> Result<PathBuf, Error> {
-    let mut in_cache = cache.get(file);
-    if force_download {
-        in_cache = None
-    }
-    if let Some(val) = in_cache {
-        Ok(val)
-    } else {
-        let progress = DownloadCallback {
-            download_state: Default::default(),
-            tx: tx.clone(),
-        };
-        match progress_bar {
-            true => repo.download(file).await,
-            false => repo.download_with_progress(file, progress).await,
-        }
-        .map_err(Into::into)
-    }
-}
-
-/// Store the state of a download
-#[derive(Debug, Clone)]
-struct DownloadState {
-    start_time: Instant,
-    len: usize,
-    offset: usize,
-    url: String,
-}
-
-impl DownloadState {
-    fn new(len: usize, url: &str) -> DownloadState {
-        DownloadState {
-            start_time: Instant::now(),
-            len,
-            offset: 0,
-            url: url.to_string(),
-        }
-    }
-
-    fn update(&mut self, delta: usize) -> Option<Event> {
-        if delta == 0 {
-            return None;
-        }
-
-        self.offset += delta;
-
-        let elapsed_time = Instant::now() - self.start_time;
-
-        let progress = self.offset as f32 / self.len as f32;
-        let progress_100 = progress * 100.;
-
-        let remaining_percentage = 100. - progress_100;
-        let duration_unit = elapsed_time
-            / if progress_100 as u32 == 0 {
-                1
-            } else {
-                progress_100 as u32
-            };
-        let remaining_time = duration_unit * remaining_percentage as u32;
-
-        let event = Event::DownloadProgress {
-            file: self.url.clone(),
-            percentage: progress_100,
-            elapsed_time,
-            remaining_time,
-        };
-        Some(event)
-    }
-}
-
-#[derive(Clone)]
-struct DownloadCallback {
-    download_state: Arc<Mutex<Option<DownloadState>>>,
-    tx: UnboundedSender<Event>,
-}
-
-impl Progress for DownloadCallback {
-    async fn init(&mut self, len: usize, file: &str) {
-        self.download_state = Arc::new(Mutex::new(Some(DownloadState::new(len, file))));
-
-        let _ = self.tx.send(Event::DownloadStarted {
-            file: file.to_owned(),
-        });
-    }
-
-    async fn update(&mut self, delta: usize) {
-        let update = self
-            .download_state
-            .lock()
-            .unwrap()
-            .as_mut()
-            .unwrap()
-            .update(delta);
-        if let Some(event) = update {
-            let _ = self.tx.send(event);
-        }
-    }
-
-    async fn finish(&mut self) {
-        let file = self
-            .download_state
-            .lock()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .url
-            .clone();
-        let _ = self.tx.send(Event::DownloadCompleted { file });
+    pub async fn download_model_listener(
+        &self,
+        force_download: bool,
+        tx: UnboundedSender<Event>,
+    ) -> Result<PathBuf, Error> {
+        self.internal_download_model(force_download, ProgressType::Callback(tx))
+            .await
     }
 }
