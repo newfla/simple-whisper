@@ -237,11 +237,8 @@ async fn internal_handle_download_model(
     params: ModelParameters,
 ) -> anyhow::Result<()> {
     let (tx, mut rx) = unbounded_channel();
-    let download = spawn(async move {
-        model
-            .download_model_listener(false, params.ignore_cache, tx)
-            .await
-    });
+    let download =
+        spawn(async move { model.download_model_listener(params.ignore_cache, tx).await });
 
     while let Some(msg) = rx.recv().await {
         socket

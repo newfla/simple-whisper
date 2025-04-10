@@ -162,7 +162,7 @@ async fn main() {
             }
             ModelCommands::Download { code, ignore_cache } => match Model::from_str(&code) {
                 Ok(model) => {
-                    if let Err(err) = model.download_model(true, ignore_cache).await {
+                    if let Err(err) = model.download_model(ignore_cache).await {
                         println!("Error {err}.\nAborting!");
                     } else {
                         println!("Download completed");
