@@ -141,6 +141,7 @@ impl Whisper {
         spawn(async move {
             // Download model data from Hugging Face
             let progress = if self.progress_bar {
+                drop(tx_event);
                 ProgressType::ProgressBar
             } else {
                 ProgressType::Callback(tx_event)
