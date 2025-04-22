@@ -138,7 +138,7 @@ jobs:
         run: |
           ${{ matrix.packages_install }}
       - name: install dependencies (ubuntu only)
-        if: matrix.runner == 'ubuntu-20.04'
+        if: matrix.runner == 'ubuntu-22.04'
         run: |
             sudo apt-get update
             sudo apt-get install -y libasound2-dev
