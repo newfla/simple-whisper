@@ -16,17 +16,17 @@ mod transcribe;
 use download::ProgressType;
 pub use language::Language;
 pub use model::Model;
-use rodio::{source::UniformSourceIterator, Decoder, Source};
+use rodio::{Decoder, Source, source::UniformSourceIterator};
 use strum::{Display, EnumIs};
 use thiserror::Error;
 use tokio::{
     spawn,
-    sync::{mpsc::unbounded_channel, Notify},
+    sync::{Notify, mpsc::unbounded_channel},
     task::spawn_blocking,
 };
 pub use transcribe::TranscribeBuilderError;
 
-use tokio_stream::{wrappers::UnboundedReceiverStream, Stream};
+use tokio_stream::{Stream, wrappers::UnboundedReceiverStream};
 use transcribe::TranscribeBuilder;
 use whisper_rs::WhisperError;
 

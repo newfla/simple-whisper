@@ -4,7 +4,7 @@ use std::{
     time::Instant,
 };
 
-use hf_hub::{api::tokio::Progress, Cache, Repo};
+use hf_hub::{Cache, Repo, api::tokio::Progress};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{Error, Event};
