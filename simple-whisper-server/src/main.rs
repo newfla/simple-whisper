@@ -1,14 +1,15 @@
 use std::{str::FromStr, time::Duration};
 
 use axum::{
+    Json, Router,
     extract::{
-        ws::{Message, WebSocket},
         DefaultBodyLimit, MatchedPath, Path, Query, WebSocketUpgrade,
+        ws::{Message, WebSocket},
     },
     http::{Request, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
-    serve, Json, Router,
+    serve,
 };
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -344,7 +345,7 @@ mod tests {
     use reqwest_websocket::{Message, RequestBuilderExt};
     use tokio::{net::TcpListener, spawn};
 
-    use crate::{app, LanguageResponse, ModelResponse, ServerResponse};
+    use crate::{LanguageResponse, ModelResponse, ServerResponse, app};
 
     macro_rules! test_file {
         ($file_name:expr) => {

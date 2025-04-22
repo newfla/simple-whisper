@@ -5,8 +5,8 @@ use strum::{Display, EnumIter, EnumString};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    download::{download_file, ProgressType},
     Error, Event,
+    download::{ProgressType, download_file},
 };
 
 struct HFCoordinates {
