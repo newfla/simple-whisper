@@ -11,6 +11,7 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       with: 
+        toolchain: 1.85.1
         components: rustfmt
     
     - name: check fmt
