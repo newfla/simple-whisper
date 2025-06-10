@@ -11,7 +11,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-whisper-rs = "0.14.2"
+whisper-rs.workspace = true
 derive_builder.workspace = true
 hf-hub.workspace = true
 num_cpus.workspace = true
