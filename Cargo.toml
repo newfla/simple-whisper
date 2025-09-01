@@ -35,7 +35,7 @@ tokio-stream = "0.1.17"
 tower-http = { version = "0.5.2", features = ["trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-whisper-rs = "0.14.3"
+whisper-rs = "0.15.0"
 
 # The profile that 'cargo dist' will build with
 [profile.dist]
