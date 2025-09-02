@@ -11,8 +11,7 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       with: 
-        toolchain: 1.85.1
-        components: rustfmt
+        components: clippy, rustfmt
     
     - name: check fmt
       run: cargo fmt --all -- --check
@@ -40,6 +39,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
