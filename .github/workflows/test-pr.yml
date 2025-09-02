@@ -11,8 +11,7 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       with: 
-        toolchain: 1.85.1
-        components: rustfmt
+        components: clippy, rustfmt
     
     - name: check fmt
       run: cargo fmt --all -- --check
@@ -21,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
+        platform: [macos-14, ubuntu-latest, windows-latest]
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -40,6 +39,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -51,9 +52,9 @@ jobs:
         run: cargo test
 
       - name: cargo build (metal)
-        if: matrix.platform == 'macos-latest'
+        if: matrix.platform == 'macos-14'
         run: cargo build --features metal
       
       - name: run generic tests (metal)
-        if: matrix.platform == 'macos-latest'
+        if: matrix.platform == 'macos-14'
         run: cargo test --features metal
