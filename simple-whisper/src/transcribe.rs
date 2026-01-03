@@ -70,9 +70,17 @@ pub enum TranscribeBuilderError {
 }
 
 fn state_builder(model: &Path) -> Result<WhisperState, WhisperError> {
+    #![allow(unused_mut)]
     let mut context_param = WhisperContextParameters::default();
-
-    context_param.use_gpu(true);
+    #[cfg(any(
+        feature = "metal",
+        feature = "vulkan",
+        feature = "cuda",
+        feature = "hipblas"
+    ))]
+    {
+        context_param.use_gpu(true);
+    }
 
     let ctx = WhisperContext::new_with_params(model.to_str().unwrap(), context_param)?;
 

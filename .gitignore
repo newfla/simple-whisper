@@ -2,3 +2,4 @@
 bin/act
 Cargo.lock
 .idea
+.DS_Store

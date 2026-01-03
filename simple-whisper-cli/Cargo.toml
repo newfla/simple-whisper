@@ -25,3 +25,4 @@ tokio-stream.workspace = true
 vulkan = ["simple-whisper/vulkan"]
 cuda = ["simple-whisper/cuda"]
 metal = ["simple-whisper/metal"]
+hipblas = ["simple-whisper/hipblas"]
