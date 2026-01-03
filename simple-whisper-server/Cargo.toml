@@ -38,3 +38,4 @@ reqwest-websocket = "0.4.0"
 vulkan = ["simple-whisper/vulkan"]
 cuda = ["simple-whisper/cuda"]
 metal = ["simple-whisper/metal"]
+hipblas = ["simple-whisper/hipblas"]
